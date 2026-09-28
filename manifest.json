@@ -1,0 +1,28 @@
+{
+  "id": "./",
+  "name": "Lipfty",
+  "short_name": "Lipfty",
+  "description": "Lipfty is a shared-piece strategy game with Learning, Standard and Extreme versions.",
+  "lang": "en-GB",
+  "dir": "ltr",
+  "start_url": "./?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#e7eeea",
+  "theme_color": "#163b30",
+  "categories": ["games", "strategy"],
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "icons/lipfty-96.png", "sizes": "96x96", "type": "image/png", "purpose": "any" },
+    { "src": "icons/lipfty-128.png", "sizes": "128x128", "type": "image/png", "purpose": "any" },
+    { "src": "icons/lipfty-144.png", "sizes": "144x144", "type": "image/png", "purpose": "any" },
+    { "src": "icons/lipfty-152.png", "sizes": "152x152", "type": "image/png", "purpose": "any" },
+    { "src": "icons/lipfty-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
+    { "src": "icons/lipfty-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/lipfty-384.png", "sizes": "384x384", "type": "image/png", "purpose": "any" },
+    { "src": "icons/lipfty-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/lipfty-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/lipfty-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

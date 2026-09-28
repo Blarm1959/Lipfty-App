@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "project": "Lipfty",
+  "version": "13.1.3",
+  "githubSource": "v13.1.3",
+  "zipPrefix": "Lipfty-",
+  "port": 0,
+  "packageChanges": false,
+  "commit": "Release Lipfty v0.0.1",
+  "i18n": {
+    "enabled": false,
+    "folder": "src/i18n",
+    "masterLanguage": "en-GB",
+    "defaultLanguage": "en-GB",
+    "languages": [
+      "en-GB"
+    ]
+  }
+}
