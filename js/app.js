@@ -261,12 +261,8 @@
   }
 
   function afterOpeningPlacement(placer) {
-    if (!state.swapDone) {
-      state.swapDone = true;
-      state.pendingSwap = { placer, decider: other(placer) };
-      state.choosingColour = false;
-      render(); processFlow(); return;
-    }
+    // Opening Four is setup only: complete all four corner placements before
+    // the Lipfty take/accept decision becomes available.
     const next = other(placer);
     state.currentPlayer = next;
     state.colourChooser = placer;
@@ -331,6 +327,18 @@
     state.assignedColour = null;
     clearSelection();
     if (finishWin()) return;
+
+    // Lipfty 14 pie rule: the Opening Four are setup. Only the first ordinary
+    // placement on the remaining 32 squares can be accepted or taken by the
+    // other player. Accept means the other player continues normally; Take
+    // means they take this position and make the original placer continue.
+    if (!state.swapDone && state.phase === "main" && !state.consequence) {
+      const placer = state.currentPlayer;
+      state.swapDone = true;
+      state.pendingSwap = { placer, decider: other(placer), firstNormalIndex: index, colour: piece.colour };
+      state.choosingColour = false;
+      render(); processFlow(); return;
+    }
 
     const c = state.consequence;
     if (c?.type === "move" && c.step === 1) {
@@ -505,7 +513,7 @@
   function statusText() {
     if (state.winner === "draw") return "Draw — every reserve piece has been used without a win.";
     if (state.winner !== null) return `${playerName(state.winner)} wins${state.winType === "square" ? " with a square" : " with four in a row"}.`;
-    if (state.pendingSwap) return `${playerName(state.pendingSwap.decider)}: carry on or swap sides?`;
+    if (state.pendingSwap) return `${playerName(state.pendingSwap.decider)}: accept the first placement or take the position?`;
     if (state.phase === "opening") {
       if (state.choosingColour) return `${playerName(state.colourChooser)}: choose the colour ${playerName(state.currentPlayer)} must place as an Opening Four piece.`;
       return `${playerName(state.currentPlayer)}: place the ${colourName(state.assignedColour)} Opening Four piece on any empty 6×6 corner.`;
@@ -621,8 +629,8 @@
   });
 
   fetch("./build-info.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(info=>{
-    el("version").textContent=`v${info?.version || "14.0.1"}`;
-  }).catch(()=>el("version").textContent="v14.0.1");
+    el("version").textContent=`v${info?.version || "14.0.2"}`;
+  }).catch(()=>el("version").textContent="v14.0.2");
 
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
     navigator.serviceWorker.register("service-worker.js", { scope: "./" }).catch(()=>{});

@@ -13,7 +13,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div><span class="eyebrow">Shared-piece strategy</span><h1>Lipfty</h1></div>
-      <div class="top-actions"><span id="version" class="version">v14.0.1</span><button id="settings-button" type="button" class="icon-btn" aria-label="Settings">⚙</button></div>
+      <div class="top-actions"><span id="version" class="version">v14.0.2</span><button id="settings-button" type="button" class="icon-btn" aria-label="Settings">⚙</button></div>
     </header>
 
     <main>
@@ -35,8 +35,8 @@
         <section class="board-wrap">
           <div id="board" class="board" role="grid" aria-label="Lipfty board"></div>
           <div id="swap-box" class="decision-box" hidden>
-            <strong>Carry on or swap sides?</strong>
-            <div><button id="carry-on" type="button">Carry on</button><button id="swap-sides" type="button">Swap sides</button></div>
+            <strong>Accept the first placement or take the position?</strong>
+            <div><button id="carry-on" type="button">Accept</button><button id="swap-sides" type="button">Take position</button></div>
           </div>
           <div id="jump-choice-box" class="decision-box" hidden>
             <strong>After the Jump, choose which piece you will place.</strong>
@@ -45,8 +45,9 @@
         </section>
 
         <aside class="panel rules-panel">
-          <h2>Lipfty 14.0.1</h2>
+          <h2>Lipfty 14.0.2</h2>
           <p><strong>Opening Four:</strong> four shaped pieces are placed on the four corners of the inner 6×6. The opponent chooses the colour; the player chooses the corner.</p>
+          <p><strong>First normal placement:</strong> after all four Opening Four pieces have been placed, the starter places the first ordinary reserve piece on any free square of the inner 6×6. The other player then chooses <strong>Accept</strong> (continue from that position) or <strong>Take position</strong> (take that first placement and make the starter continue with the next piece).</p>
           <p><strong>Main play:</strong> Place, Move or Jump as in Lipfty 13.</p>
           <p><strong>Corner rule:</strong> an Opening Four piece cannot count in any winning pattern while its matching outer corner is locked.</p>
           <p><strong>Release rule:</strong> when all six ordinary reserve pieces on an outside edge have gone, <em>both</em> corners on that edge are released. Their matching inner corners immediately become fully live for all winning patterns.</p>
