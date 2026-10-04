@@ -1,460 +1,82 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en-GB">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#163b30">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Lipfty">
-  <meta name="application-name" content="Lipfty">
-  <meta name="description" content="Lipfty is a shared-piece strategy game for two players, played with 24 draughts pieces on a chess or draughts board, with Learning, Standard and Extreme versions.">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#173c31">
   <title>Lipfty</title>
+  <meta name="description" content="Lipfty 14 experimental shared-piece strategy game">
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" href="icons/lipfty-192.png" type="image/png">
-  <link rel="apple-touch-icon" href="icons/lipfty-180.png">
   <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/lipfty8-layout.css">
 </head>
 <body>
   <div class="app-shell">
-    <header class="app-header">
-      <div>
-        <p class="eyebrow">Shared-piece strategy</p>
-        <h1>Lipfty</h1>
-      </div>
-      <span class="mobile-version" id="mobile-version" aria-hidden="true"></span>
-      <div class="header-actions">
-        <button class="icon-button" id="help-button" type="button" aria-label="How to play">?</button>
-        <button class="icon-button" id="settings-button" type="button" aria-label="Settings">⚙</button>
-      </div>
+    <header class="topbar">
+      <div><span class="eyebrow">Shared-piece strategy</span><h1>Lipfty</h1></div>
+      <div class="top-actions"><span id="version" class="version">v14.0.1</span><button id="settings-button" type="button" class="icon-btn" aria-label="Settings">⚙</button></div>
     </header>
 
-    <main class="game-layout">
-      <section class="turn-status-row" aria-live="polite">
-        <div class="player-status-card player-status-card--active">
-          <span class="turn-label">Current turn</span>
-          <strong id="current-player">Player</strong>
-        </div>
-        <div class="chess-clock-panel" id="chess-clocks" hidden aria-label="Chess clocks">
-          <div class="chess-clock-card" data-clock-player="0">
-            <span class="chess-clock-name" id="clock-player-0-name">Player</span>
-            <strong id="clock-player-0">15:00</strong>
-          </div>
-          <div class="chess-clock-card" data-clock-player="1">
-            <span class="chess-clock-name" id="clock-player-1-name">Computer</span>
-            <strong id="clock-player-1">15:00</strong>
-          </div>
-        </div>
-        <div class="turn-message-card"><p id="status">Choose a shared reserve piece to begin.</p></div>
+    <main>
+      <section class="status-grid">
+        <div class="status-card"><small>Current turn</small><strong id="current-player">Player 1</strong></div>
+        <div class="status-card"><small>Phase</small><strong id="phase-label">Opening Four</strong></div>
+        <div class="message-card" id="status">Starting Lipfty 14…</div>
       </section>
 
-      <section class="game-stage">
-        <aside class="reserve-panel">
-          <h2 id="reserve-heading">Colour to use</h2>
-          <div class="reserve-grid">
-            <button class="reserve-button" id="place-black" type="button">
-              <span class="piece piece--black"></span>
-              <span><strong id="colour1-name">Red</strong><small id="black-remaining">12 remaining</small></span>
-            </button>
-            <button class="reserve-button" id="place-white" type="button">
-              <span class="piece piece--white"></span>
-              <span><strong id="colour2-name">Blue</strong><small id="white-remaining">12 remaining</small></span>
-            </button>
-          </div>
+      <section class="game-grid">
+        <aside class="panel reserve-panel">
+          <h2>Choose colour</h2>
+          <p class="muted">Your opponent chooses the colour you must use.</p>
+          <button id="choose-black" class="colour-choice" type="button"><span class="mini-piece"></span><span><strong>Black</strong><small>2 available</small></span></button>
+          <button id="choose-white" class="colour-choice" type="button"><span class="mini-piece"></span><span><strong>White</strong><small>2 available</small></span></button>
+          <p id="reserve-info" class="reserve-info"></p>
         </aside>
 
-        <aside class="stage-info-card" id="stage-info-card">
-          <p class="panel-help" id="phase-help">Main play · four diagonal-colour opening anchors are already pinned on the inner 6×6 corners.</p>
-          <p class="placement-alert" id="placement-alert" hidden></p>
-        </aside>
-
-        <section class="board-section">
-          <div class="board-frame">
-            <div class="board" id="board" role="grid" aria-label="Lipfty eight by eight board with inner six by six playing area"></div>
-            <p class="board-note" id="board-note">Lipfty: the inner 6×6 starts empty; the 24 pieces start round the outside ring, leaving the four corners empty.</p>
+        <section class="board-wrap">
+          <div id="board" class="board" role="grid" aria-label="Lipfty board"></div>
+          <div id="swap-box" class="decision-box" hidden>
+            <strong>Carry on or swap sides?</strong>
+            <div><button id="carry-on" type="button">Carry on</button><button id="swap-sides" type="button">Swap sides</button></div>
           </div>
-          <div class="jump-controls" id="jump-controls" hidden>
-            <button class="button button--primary" id="finish-jump" type="button">Finish turn</button>
+          <div id="jump-choice-box" class="decision-box" hidden>
+            <strong>After the Jump, choose which piece you will place.</strong>
+            <div><button id="choose-handed" type="button"></button><button id="choose-jumped" type="button"></button></div>
           </div>
         </section>
 
-        <aside class="rules-panel rules-panel--quick">
-          <h2 id="quick-rules-title">Lipfty · Standard</h2>
-          <p id="quick-opening-rule"><strong>Start:</strong> the inner 6×6 starts empty. All 24 pieces (12 of each colour) start round the outside ring and are shared by both players.</p>
-          <p><strong>Your turn:</strong> use the reserve colour handed to you to <strong>Place</strong>, <strong>Move</strong> one adjacent square, or make one opposite-colour <strong>Jump</strong>.</p>
-          <p id="quick-consequence-rule"><strong>After a Move or Jump:</strong> your opponent chooses what they place, then you place the other piece.</p>
-          <p><strong>Swap:</strong> after the first piece, the other player may swap sides.</p>
-          <p id="quick-win-rule"><strong>Win:</strong> make four in a horizontal, vertical or diagonal line.</p>
-          <p class="panel-help"><strong>?</strong> opens the complete rules, including Learning, Standard and Extreme.</p>
+        <aside class="panel rules-panel">
+          <h2>Lipfty 14.0.1</h2>
+          <p><strong>Opening Four:</strong> four shaped pieces are placed on the four corners of the inner 6×6. The opponent chooses the colour; the player chooses the corner.</p>
+          <p><strong>Main play:</strong> Place, Move or Jump as in Lipfty 13.</p>
+          <p><strong>Corner rule:</strong> an Opening Four piece cannot count in any winning pattern while its matching outer corner is locked.</p>
+          <p><strong>Release rule:</strong> when all six ordinary reserve pieces on an outside edge have gone, <em>both</em> corners on that edge are released. Their matching inner corners immediately become fully live for all winning patterns.</p>
+          <p><strong>Extreme:</strong> tight and spaced square wins are also allowed, but a blocked Opening Four piece cannot take part until its matching outer corner has been released.</p>
         </aside>
       </section>
 
-      <section class="action-bar">
-        <div class="action-bar-left">
-          <button class="button button--primary" id="new-game" type="button">New game</button>
-          <button class="button button--secondary" id="end-test" type="button">End</button>
-        </div>
-        <div class="action-bar-centre"><button class="button button--secondary" id="undo" type="button">Undo</button></div>
-        <div class="build-info"><span id="app-version"></span><span id="build-reference"></span></div>
+      <section class="actionbar">
+        <button id="new-game" type="button" class="primary">New game</button>
+        <button id="undo" type="button">Undo</button>
       </section>
     </main>
   </div>
 
-  <dialog class="setup-wizard-dialog" id="settings-dialog">
-    <form id="settings-form">
-      <div class="dialog-heading setup-wizard-heading">
-        <div><p class="dialog-eyebrow">Game setup</p><h2>New game</h2></div>
-        <button class="dialog-close" id="close-settings" type="button" aria-label="Close">×</button>
-      </div>
-      <div class="wizard-progress">
-        <span class="wizard-progress-step wizard-progress-step--active" data-step-indicator="0">1 <small>Game</small></span><span class="wizard-progress-line"></span>
-        <span class="wizard-progress-step" data-step-indicator="1">2 <small>Colours</small></span><span class="wizard-progress-line"></span>
-        <span class="wizard-progress-step" data-step-indicator="2">3 <small>Version</small></span><span class="wizard-progress-line"></span>
-        <span class="wizard-progress-step" data-step-indicator="3">4 <small>Players</small></span><span class="wizard-progress-line"></span>
-        <span class="wizard-progress-step" data-step-indicator="4">5 <small>Timer</small></span><span class="wizard-progress-line"></span>
-        <span class="wizard-progress-step" data-step-indicator="5">6 <small>Options</small></span>
-      </div>
-
-      <section class="wizard-step" data-wizard-step="0">
-        <h3>Choose your Lipfty game</h3>
-        <input checked hidden name="gameFormat" type="radio" value="lipfty24">
-        <fieldset class="setup-fieldset"><legend>Game mode</legend><div class="mode-choice-grid">
-          <label class="mode-choice"><input checked name="gameMode" type="radio" value="computer"><span><strong>One player</strong><small>Play against the computer</small></span></label>
-          <label class="mode-choice"><input name="gameMode" type="radio" value="two"><span><strong>Two players</strong><small>Share this device</small></span></label>
-        </div></fieldset>
-        <div class="difficulty-field" id="difficulty-field">
-          <div><strong>Computer difficulty</strong><span id="difficulty-name">2 · Standard</span></div>
-          <input id="difficulty-input" max="3" min="1" step="1" type="range" value="2">
-          <div class="difficulty-scale"><span>1 Beginner</span><span>2 Standard</span><span>3 Expert</span></div>
-          <p class="setup-help">Standard sees immediate wins and useful tactical moves.</p>
-        </div>
-        <fieldset class="setup-fieldset"><legend>Allow last move Undo?</legend><div class="choice-grid">
-          <label><input name="allowUndo" type="radio" value="no"><span>No</span></label>
-          <label><input checked name="allowUndo" type="radio" value="yes"><span>Yes</span></label>
-        </div></fieldset>
-      </section>
-
-      <section class="wizard-step" data-wizard-step="1" hidden>
-        <h3>Choose colours</h3>
-        <p class="setup-help">Choose two different colours for the shared Lipfty pieces.</p>
-        <div class="colour-set-grid">
-          <fieldset class="setup-fieldset"><legend>Colour 1</legend><div class="colour-choice-grid" id="colour1-choices"></div></fieldset>
-          <fieldset class="setup-fieldset"><legend>Colour 2</legend><div class="colour-choice-grid" id="colour2-choices"></div></fieldset>
-        </div>
-      </section>
-
-      <section class="wizard-step" data-wizard-step="2" hidden>
-        <h3>Choose game version</h3>
-        <p class="setup-help">Learning is placement-only; Standard adds Move and Jump; Extreme adds the two Square patterns.</p>
-        <fieldset class="setup-fieldset"><legend>Version</legend><div class="mode-choice-grid">
-          <label class="mode-choice"><input name="gameVersion" type="radio" value="learning"><span><strong>Learning</strong><small>Horizontal, vertical or diagonal four-in-line · placement only</small></span></label>
-          <label class="mode-choice"><input checked name="gameVersion" type="radio" value="standard"><span><strong>Standard</strong><small>Four-in-line wins with Place, Move and Jump</small></span></label>
-          <label class="mode-choice"><input name="gameVersion" type="radio" value="extreme"><span><strong>Extreme</strong><small>Standard plus tight and spaced Square wins</small></span></label>
-        </div></fieldset>
-        <div hidden aria-hidden="true">
-          <input data-rule-option data-rule-label="Jump" id="setting-allow-jump" type="checkbox">
-          <input data-rule-option data-rule-label="Move" id="setting-allow-move" type="checkbox">
-          <input data-rule-option data-rule-label="Diagonal" id="setting-allow-diagonal" type="checkbox">
-          <input data-rule-option data-rule-label="Square" id="setting-allow-square" type="checkbox">
-          <input data-rule-option data-rule-label="Spaced Square" id="setting-allow-spaced-square" type="checkbox">
-        </div>
-      </section>
-
-      <section class="wizard-step" data-wizard-step="3" hidden>
-        <h3>Who is playing?</h3>
-        <div class="setup-grid setup-grid--players">
-          <label class="field-label"><span id="player1-label-text">Player name</span><input class="text-input" id="setting-player1" maxlength="24"></label>
-          <label class="field-label" id="player2-label"><span>Player 2 name</span><input class="text-input" id="setting-player2" maxlength="24"></label>
-        </div>
-        <fieldset class="setup-fieldset"><legend>Who starts?</legend><div class="choice-grid">
-          <label><input checked name="starter" type="radio" value="random"><span>Random</span></label>
-          <label><input name="starter" type="radio" value="alternate"><span>Alternate each game</span></label>
-          <label><input name="starter" type="radio" value="player"><span id="starter-player-label">Player</span></label>
-          <label><input name="starter" type="radio" value="computer"><span id="starter-other-label">Computer</span></label>
-        </div></fieldset>
-      </section>
-
-      <section class="wizard-step" data-wizard-step="4" hidden>
-        <h3>Timer options</h3>
-        <fieldset class="setup-fieldset"><legend>Chess clock</legend>
-          <p class="setup-help">Optional total thinking time for each player. Off is the normal Lipfty game.</p>
-          <div class="choice-grid clock-choice-grid">
-            <label><input checked name="clockMinutes" type="radio" value="0"><span>Off</span></label>
-            <label><input name="clockMinutes" type="radio" value="5"><span>5 minutes</span></label>
-            <label><input name="clockMinutes" type="radio" value="10"><span>10 minutes</span></label>
-            <label><input name="clockMinutes" type="radio" value="15"><span>15 minutes</span></label>
-            <label><input name="clockMinutes" type="radio" value="30"><span>30 minutes</span></label>
-            <label><input name="clockMinutes" type="radio" value="60"><span>60 minutes</span></label>
-          </div>
-        </fieldset>
-        <fieldset class="setup-fieldset" id="clock-increment-field" disabled><legend>Clock increment</legend>
-          <p class="setup-help">Added when control passes after a player's completed decision.</p>
-          <div class="choice-grid">
-            <label><input checked name="clockIncrement" type="radio" value="0"><span>+0 seconds</span></label>
-            <label><input name="clockIncrement" type="radio" value="5"><span>+5 seconds</span></label>
-            <label><input name="clockIncrement" type="radio" value="10"><span>+10 seconds</span></label>
-          </div>
-        </fieldset>
-      </section>
-
-      <section class="wizard-step" data-wizard-step="5" hidden>
-        <h3>Game options</h3>
-        <fieldset class="setup-fieldset"><legend>Game feel</legend><div class="toggle-list">
-          <label class="toggle-row"><span><strong>Sound effects</strong></span><input checked id="setting-sound" type="checkbox"></label>
-          <label class="toggle-row"><span><strong>Animations</strong></span><input checked id="setting-animations" type="checkbox"></label>
-        </div></fieldset>
-        <fieldset class="setup-fieldset"><legend>Language</legend><select class="text-input" id="setting-language"><option value="en-GB">British English</option></select></fieldset>
-        <button class="button button--secondary settings-statistics-button" id="view-statistics-button" type="button">View statistics</button>
-        <div class="setup-summary" id="setup-summary"></div>
-      </section>
-
-      <div class="wizard-actions">
-        <button class="button button--secondary" id="cancel-settings" type="button">Cancel</button>
-        <button class="button button--secondary" id="wizard-back" type="button" hidden>Back</button>
-        <button class="button button--primary" id="wizard-next" type="button">Next</button>
-        <button class="button button--primary" id="wizard-start" type="submit" hidden>Start game</button>
-      </div>
-    </form>
-  </dialog>
-
-  <dialog id="statistics-dialog">
-    <div class="dialog-heading"><div><p class="dialog-eyebrow">Lipfty</p><h2>Statistics</h2></div><button class="dialog-close" id="close-statistics" type="button">×</button></div>
-    <div class="statistics-content" id="statistics-content"></div>
-    <div class="statistics-actions"><button class="button button--secondary" id="reset-statistics" type="button">Reset statistics</button></div>
-  </dialog>
-
-  <dialog id="help-dialog">
-    <div class="dialog-heading">
-      <div><p class="dialog-eyebrow">How to play</p><h2>Lipfty</h2></div>
-      <button class="dialog-close" id="close-help" type="button" aria-label="Close">×</button>
-    </div>
-    <div class="rules-copy">
-      <p>A two-player strategy game with shared pieces: neither player owns a colour. In the app the board is set up for you; the setup notes below are for playing with a real board.</p>
-      <h3>What you need</h3>
-      <p>An 8×8 board and <strong>24 pieces</strong>, 12 of each colour. An official <strong>Lipfty set</strong> is red and blue, just as a chess set is black and white: a red-and-blue board with 12 red and 12 blue pieces.</p>
-      <p><strong>No Lipfty set?</strong> Use an ordinary chess or draughts board and the 24 draughts pieces (most chess sets come with them). Any two colours work if you can tell them apart.</p>
-      <h3>Set up</h3>
-      <p>Play on the <strong>inner 6×6</strong>, which starts empty. The outside ring holds the <strong>reserve</strong>: put the 24 pieces round it in any order, leaving the four corners empty.</p>
-      <h3>The big idea</h3>
-      <p><strong>Your opponent picks your colour.</strong> Each turn you are <em>handed</em> one reserve piece, and you must play that colour. When your turn ends, you pick a reserve piece and hand it to your opponent.</p>
-      <h3>Starting: the swap rule</h3>
-      <p>The other player hands the starter the first piece and the starter places it. The other player then chooses: <strong>carry on</strong> (they are handed a piece and play next) or <strong>swap sides</strong> (they take over the starter's position, hand the starter a piece, and the starter plays next). The first piece stays where it is. So place your first piece somewhere fair: if it helps the player who placed it, your opponent will simply swap.</p>
-      <h3>On your turn</h3>
-      <p>Use the colour you were handed and do <strong>one</strong> of these:</p>
-      <p><strong>Place</strong>: put the handed piece on any empty square in the 6×6. This is always allowed.</p>
-      <p><strong>Move</strong> (Standard/Extreme): move a board piece of the handed colour one square in any direction (including diagonally) into an empty square.</p>
-      <p><strong>Jump</strong> (Standard/Extreme): leap a board piece of the handed colour over one adjacent piece of the <em>other</em> colour into the empty square directly beyond, in any direction. Only one jump at a time.</p>
-      <p>You may not Move or Jump the exact piece your opponent just moved on their last turn.</p>
-      <h3>After a Move</h3>
-      <p>Keep the piece you were handed. Your <strong>opponent chooses</strong> a colour, the same as your piece or the other one, takes a piece of that colour from the reserve and places it. If that doesn't win, you place the piece you were holding. Then, as normal, you choose a piece for your opponent, and they take a normal turn.</p>
-      <h3>After a Jump</h3>
-      <p>Lift off the piece you jumped over. You now hold two pieces, one of each colour: the one you were handed and the jumped one. Your <strong>opponent chooses</strong> one of them and places it on any empty square. If that doesn't win, you place the other one. Then, as normal, you choose a piece for your opponent, and they take a normal turn.</p>
-      <p><strong>Careful:</strong> never leave three of a colour in a row with a gap after a Move or Jump. Your opponent can pick that colour and finish the line themselves.</p>
-      <h3>Winning</h3>
-      <p>Make a winning pattern of <strong>one colour</strong> and you win at once, whoever the pieces “belong” to. Check after every placement, Move, Jump and redeploy. If a Move or Jump wins, skip the steps that normally follow it.</p>
-      <p><strong>Winning patterns</strong> (four pieces of the same colour): four in a row horizontally, vertically or diagonally; in Extreme also a 2×2 Square or a spaced Square (four corners of a larger square lined up with the board).</p>
-      <h3>Game versions</h3>
-      <p><strong>Learning:</strong> Place only. Four in a row: horizontal, vertical or diagonal.<br><strong>Standard:</strong> Place, Move and Jump. Four in a row. <em>The usual game.</em><br><strong>Extreme:</strong> As Standard, plus 2×2 Squares and spaced Squares also win.</p>
-      <h3>Ending the game</h3>
-      <p><strong>One colour runs out:</strong> as soon as the reserve has no pieces of one colour left, Move and Jump stop. Place the remaining reserve pieces one per turn. If a Move is already being settled, finish it first.</p>
-      <p><strong>Draw:</strong> if all 24 pieces have been placed and nobody has made a winning pattern, the game is a draw.</p>
-      <h3>First game?</h3>
-      <p>Start with <strong>Learning</strong> to get used to being handed your colour, then try <strong>Standard</strong>. You can play against the computer or pass-and-play with a friend.</p>
-      <h3>In the app: Undo and chess clock</h3>
-      <p>The optional chess-style clock can give each player 5, 10, 15, 30 or 60 minutes, with an optional 5- or 10-second increment. Only the player currently making the decision has their clock running. Running out of time loses the game. Undo restores the clocks with the restored decision.</p>
-      <p><a class="button button--secondary" href="Lipfty-Rules.pdf" target="_blank" rel="noopener">Printable rules with diagrams and worked examples (PDF)</a></p>
-    </div>
-  </dialog>
-
-  <dialog aria-labelledby="swap-title" class="pwa-update-dialog swap-dialog" id="swap-dialog">
-    <form method="dialog">
-      <div class="dialog-heading"><div><p class="dialog-eyebrow">Swap rule</p><h2 id="swap-title">Carry on, or swap sides?</h2></div></div>
-      <p id="swap-text">The first piece has been placed.</p>
-      <p class="dialog-note" id="swap-carry-note">Carry on: you are handed a piece and take the next turn.</p>
-      <p class="dialog-note" id="swap-sides-note">Swap sides: you take over the other player's position. You hand them a piece and they take the next turn. The first piece stays where it is.</p>
-      <div class="dialog-actions pwa-update-actions">
-        <button class="button button--secondary" id="swap-carry-on" type="button">Carry on</button>
-        <button class="button button--primary" id="swap-sides" type="button">Swap sides</button>
-      </div>
-    </form>
-  </dialog>
-
-  <dialog aria-labelledby="pwa-update-title" class="pwa-update-dialog" id="pwa-update-dialog">
-    <form method="dialog">
-      <div class="dialog-heading"><div><p class="dialog-eyebrow">Lipfty update</p><h2 id="pwa-update-title">New version available</h2></div></div>
-      <p>A new version of Lipfty has been downloaded and is ready to install.</p>
-      <p class="dialog-note">Update now to reload the app, or choose Later to continue with the current version.</p>
-      <div class="dialog-actions pwa-update-actions">
-        <button class="button button--secondary" id="pwa-update-later" type="button">Later</button>
-        <button class="button button--primary" id="pwa-update-button" type="button">Update</button>
-      </div>
+  <dialog id="settings-dialog">
+    <form id="settings-form" method="dialog">
+      <div class="dialog-head"><div><span class="eyebrow">Lipfty 14</span><h2>Settings</h2></div></div>
+      <div id="settings-error" class="error"></div>
+      <label>Game mode<select id="setting-mode"><option value="computer">One player</option><option value="two">Two players</option></select></label>
+      <label>Computer difficulty<select id="setting-level"><option value="beginner">Beginner</option><option value="standard">Standard</option><option value="expert">Expert</option></select></label>
+      <label>Version<select id="setting-version"><option value="learning">Learning — Place only</option><option value="standard">Standard — Place / Move / Jump</option><option value="extreme">Extreme — Standard + Square wins</option></select></label>
+      <label>Starter<select id="setting-starter"><option value="random">Random</option><option value="p1">Player 1</option><option value="p2">Player 2 / Computer</option></select></label>
+      <div class="two-col"><label>Colour 1<select id="setting-colour1"><option value="black">Black</option><option value="red">Red</option><option value="blue">Blue</option><option value="green">Green</option><option value="yellow">Yellow</option><option value="purple">Purple</option><option value="orange">Orange</option><option value="white">White</option></select></label>
+      <label>Colour 2<select id="setting-colour2"><option value="white">White</option><option value="blue">Blue</option><option value="red">Red</option><option value="green">Green</option><option value="yellow">Yellow</option><option value="purple">Purple</option><option value="orange">Orange</option><option value="black">Black</option></select></label></div>
+      <label class="check"><input id="setting-undo" type="checkbox" checked> Allow Undo</label>
+      <div class="dialog-actions"><button id="settings-cancel" type="button">Cancel</button><button type="submit" class="primary">Save & New Game</button></div>
     </form>
   </dialog>
 
   <script src="js/rules.js"></script>
-  <script>
-  (function () {
-    "use strict";
-
-    const STORAGE_KEY = "lipfty-settings";
-    const LIPFTY10_VERSION_BASELINE = 2;
-    const VERSION_RULES = {
-      learning: { allowJump: false, allowMove: false, allowDiagonal: true, allowSquare: false, allowSpacedSquare: false },
-      standard: { allowJump: true, allowMove: true, allowDiagonal: true, allowSquare: false, allowSpacedSquare: false },
-      extreme: { allowJump: true, allowMove: true, allowDiagonal: true, allowSquare: true, allowSpacedSquare: true }
-    };
-    const VERSION_LABELS = { learning: "Learning", standard: "Standard", extreme: "Extreme" };
-    const FORMAT_LABELS = { lipfty: "Lipfty", lipfty24: "Lipfty" };
-
-    function readSettings() {
-      try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
-      catch (_) { return {}; }
-    }
-
-    function writeSettings(value) { localStorage.setItem(STORAGE_KEY, JSON.stringify(value)); }
-    // Lipfty 13.1: one game (the 24-piece layout).
-    function normaliseFormat() { return "lipfty24"; }
-
-    function inferVersion(value) {
-      if (VERSION_RULES[value?.gameVersion]) return value.gameVersion;
-      if (!value?.allowJump && !value?.allowMove) return "learning";
-      if (value?.allowSquare || value?.allowSpacedSquare) return "extreme";
-      return "standard";
-    }
-
-    function applyVersionRules(value, version) {
-      const selected = VERSION_RULES[version] ? version : "standard";
-      const config = VERSION_RULES[selected];
-      return Object.assign(value, {
-        gameFormat: normaliseFormat(value?.gameFormat),
-        gameVersion: selected,
-        lipfty10GameVersionBaseline: LIPFTY10_VERSION_BASELINE,
-        rulesBaseline: 10,
-        allowJump: config.allowJump,
-        allowMove: config.allowMove,
-        allowDiagonal: config.allowDiagonal,
-        allowSquare: config.allowSquare,
-        allowSpacedSquare: config.allowSpacedSquare,
-        allowDiamond: false,
-        allowSpacedDiamond: false
-      });
-    }
-
-    let stored = readSettings();
-    if (stored.lipfty10GameVersionBaseline !== LIPFTY10_VERSION_BASELINE) stored = applyVersionRules(stored, "standard");
-    else stored = applyVersionRules(stored, inferVersion(stored));
-    writeSettings(stored);
-
-    function selectedVersion(form) { return form.querySelector('[name="gameVersion"]:checked')?.value || "standard"; }
-    function selectedFormat(form) { return normaliseFormat(form.querySelector('[name="gameFormat"]:checked')?.value); }
-
-    function applyVersionToHidden(form, version) {
-      const selected = VERSION_RULES[version] ? version : "standard";
-      const config = VERSION_RULES[selected];
-      const values = {
-        "setting-allow-jump": config.allowJump,
-        "setting-allow-move": config.allowMove,
-        "setting-allow-diagonal": config.allowDiagonal,
-        "setting-allow-square": config.allowSquare,
-        "setting-allow-spaced-square": config.allowSpacedSquare
-      };
-      Object.entries(values).forEach(([id, checked]) => {
-        const input = document.getElementById(id);
-        if (input) input.checked = checked;
-      });
-      const spaced = document.getElementById("setting-allow-spaced-square");
-      if (spaced) spaced.disabled = !config.allowSquare;
-    }
-
-    function syncRadioFromRules(form) {
-      const jump = !!document.getElementById("setting-allow-jump")?.checked;
-      const move = !!document.getElementById("setting-allow-move")?.checked;
-      const square = !!document.getElementById("setting-allow-square")?.checked;
-      const spaced = !!document.getElementById("setting-allow-spaced-square")?.checked;
-      const version = !jump && !move ? "learning" : spaced || square ? "extreme" : "standard";
-      const radio = form.querySelector(`[name="gameVersion"][value="${version}"]`);
-      if (radio) radio.checked = true;
-      return version;
-    }
-
-    function updateQuickRules(version, format) {
-      const selected = VERSION_RULES[version] ? version : "standard";
-      const selectedFormat = normaliseFormat(format);
-      const title = document.getElementById("quick-rules-title");
-      const win = document.getElementById("quick-win-rule");
-      if (title) title.textContent = `${FORMAT_LABELS[selectedFormat]} · ${VERSION_LABELS[selected]}`;
-      if (!win) return;
-      if (selected === "learning") win.innerHTML = "<strong>Win:</strong> make four in a horizontal, vertical or diagonal line. Learning is placement-only.";
-      else if (selected === "extreme") win.innerHTML = "<strong>Win:</strong> make four in a horizontal, vertical or diagonal line, a tight 2×2 Square, or a spaced board-aligned Square.";
-      else win.innerHTML = "<strong>Win:</strong> make four in a horizontal, vertical or diagonal line.";
-    }
-
-    function rewriteSummary(form) {
-      const summary = document.getElementById("setup-summary");
-      if (!summary?.textContent) return;
-      const parts = summary.textContent.split(" · ");
-      if (parts.length < 4) return;
-      const format = FORMAT_LABELS[selectedFormat(form)];
-      const versionIndex = parts.length - 2;
-      const version = VERSION_LABELS[selectedVersion(form)];
-      if (parts[0] === format && parts[versionIndex] === version) return;
-      parts[0] = format;
-      parts[versionIndex] = version;
-      summary.textContent = parts.join(" · ");
-    }
-
-    window.addEventListener("DOMContentLoaded", () => {
-      const form = document.getElementById("settings-form");
-      const settingsButton = document.getElementById("settings-button");
-      if (!form) return;
-
-      const saved = readSettings();
-      const format = normaliseFormat(saved.gameFormat);
-      const formatRadio = form.querySelector(`[name="gameFormat"][value="${format}"]`);
-      if (formatRadio) formatRadio.checked = true;
-      const version = inferVersion(saved);
-      const versionRadio = form.querySelector(`[name="gameVersion"][value="${version}"]`);
-      if (versionRadio) versionRadio.checked = true;
-      applyVersionToHidden(form, version);
-      updateQuickRules(version, format);
-
-      form.querySelectorAll('[name="gameFormat"]').forEach(radio => {
-        radio.addEventListener("change", () => { updateQuickRules(selectedVersion(form), selectedFormat(form)); rewriteSummary(form); });
-      });
-      form.querySelectorAll('[name="gameVersion"]').forEach(radio => {
-        radio.addEventListener("change", () => {
-          const selected = selectedVersion(form);
-          applyVersionToHidden(form, selected);
-          updateQuickRules(selected, selectedFormat(form));
-          rewriteSummary(form);
-        });
-      });
-
-      settingsButton?.addEventListener("click", () => {
-        const selected = syncRadioFromRules(form);
-        updateQuickRules(selected, selectedFormat(form));
-      });
-
-      form.addEventListener("submit", () => { applyVersionToHidden(form, selectedVersion(form)); }, true);
-      form.addEventListener("submit", () => {
-        const selected = selectedVersion(form);
-        const value = readSettings();
-        value.gameFormat = selectedFormat(form);
-        const savedValue = applyVersionRules(value, selected);
-        writeSettings(savedValue);
-        updateQuickRules(selected, savedValue.gameFormat);
-      });
-
-      const summary = document.getElementById("setup-summary");
-      if (summary) {
-        const observer = new MutationObserver(() => rewriteSummary(form));
-        observer.observe(summary, { childList: true, characterData: true, subtree: true });
-      }
-    });
-  })();
-  </script>
   <script src="js/app.js"></script>
 </body>
 </html>
