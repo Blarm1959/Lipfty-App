@@ -13,7 +13,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div><span class="eyebrow">Shared-piece strategy</span><h1>Lipfty</h1></div>
-      <div class="top-actions"><span id="version" class="version">v14.0.2</span><button id="settings-button" type="button" class="icon-btn" aria-label="Settings">⚙</button></div>
+      <div class="top-actions"><span id="version" class="version">v14.0.3</span><button id="settings-button" type="button" class="icon-btn" aria-label="Settings">⚙</button></div>
     </header>
 
     <main>
@@ -27,8 +27,8 @@
         <aside class="panel reserve-panel">
           <h2>Choose colour</h2>
           <p class="muted">Your opponent chooses the colour you must use.</p>
-          <button id="choose-black" class="colour-choice" type="button"><span class="mini-piece"></span><span><strong>Black</strong><small>2 available</small></span></button>
-          <button id="choose-white" class="colour-choice" type="button"><span class="mini-piece"></span><span><strong>White</strong><small>2 available</small></span></button>
+          <button id="choose-black" class="colour-choice" type="button"><span class="mini-piece"></span><span><strong>Red</strong><small>2 available</small></span></button>
+          <button id="choose-white" class="colour-choice" type="button"><span class="mini-piece"></span><span><strong>Blue</strong><small>2 available</small></span></button>
           <p id="reserve-info" class="reserve-info"></p>
         </aside>
 
@@ -45,7 +45,7 @@
         </section>
 
         <aside class="panel rules-panel">
-          <h2>Lipfty 14.0.2</h2>
+          <h2>Lipfty 14.0.3</h2>
           <p><strong>Opening Four:</strong> four shaped pieces are placed on the four corners of the inner 6×6. The opponent chooses the colour; the player chooses the corner.</p>
           <p><strong>First normal placement:</strong> after all four Opening Four pieces have been placed, the starter places the first ordinary reserve piece on any free square of the inner 6×6. The other player then chooses <strong>Accept</strong> (continue from that position) or <strong>Take position</strong> (take that first placement and make the starter continue with the next piece).</p>
           <p><strong>Main play:</strong> Place, Move or Jump as in Lipfty 13.</p>
@@ -70,8 +70,8 @@
       <label>Computer difficulty<select id="setting-level"><option value="beginner">Beginner</option><option value="standard">Standard</option><option value="expert">Expert</option></select></label>
       <label>Version<select id="setting-version"><option value="learning">Learning — Place only</option><option value="standard">Standard — Place / Move / Jump</option><option value="extreme">Extreme — Standard + Square wins</option></select></label>
       <label>Starter<select id="setting-starter"><option value="random">Random</option><option value="p1">Player 1</option><option value="p2">Player 2 / Computer</option></select></label>
-      <div class="two-col"><label>Colour 1<select id="setting-colour1"><option value="black">Black</option><option value="red">Red</option><option value="blue">Blue</option><option value="green">Green</option><option value="yellow">Yellow</option><option value="purple">Purple</option><option value="orange">Orange</option><option value="white">White</option></select></label>
-      <label>Colour 2<select id="setting-colour2"><option value="white">White</option><option value="blue">Blue</option><option value="red">Red</option><option value="green">Green</option><option value="yellow">Yellow</option><option value="purple">Purple</option><option value="orange">Orange</option><option value="black">Black</option></select></label></div>
+      <div class="two-col"><label>Colour 1<select id="setting-colour1"><option value="red">Red</option><option value="blue">Blue</option><option value="black">Black</option><option value="green">Green</option><option value="yellow">Yellow</option><option value="purple">Purple</option><option value="orange">Orange</option><option value="white">White</option></select></label>
+      <label>Colour 2<select id="setting-colour2"><option value="blue">Blue</option><option value="red">Red</option><option value="white">White</option><option value="green">Green</option><option value="yellow">Yellow</option><option value="purple">Purple</option><option value="orange">Orange</option><option value="black">Black</option></select></label></div>
       <label class="check"><input id="setting-undo" type="checkbox" checked> Allow Undo</label>
       <div class="dialog-actions"><button id="settings-cancel" type="button">Cancel</button><button type="submit" class="primary">Save & New Game</button></div>
     </form>

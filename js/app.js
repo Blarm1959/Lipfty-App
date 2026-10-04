@@ -34,19 +34,76 @@
   let timer = null;
 
   function defaultSettings() {
-    return { mode: "computer", level: "standard", version: "standard", starter: "random", colour1: "black", colour2: "white", undo: true };
+    return { mode: "computer", level: "standard", version: "standard", starter: "random", colour1: "red", colour2: "blue", colourDefaultsVersion: 1403, undo: true };
   }
   function loadSettings() {
-    try { return { ...defaultSettings(), ...JSON.parse(localStorage.getItem("lipfty14-settings") || "{}") }; }
-    catch (_) { return defaultSettings(); }
+    try {
+      const saved = JSON.parse(localStorage.getItem("lipfty14-settings") || "{}");
+      // v14.0.3 restores Red / Blue as the Lipfty default. Existing installs
+      // that are still on the old v14.0.2 Black / White default migrate once;
+      // later explicit colour choices are preserved by the marker below.
+      if (saved.colourDefaultsVersion !== 1403) {
+        if ((saved.colour1 === undefined || saved.colour1 === "black") &&
+            (saved.colour2 === undefined || saved.colour2 === "white")) {
+          saved.colour1 = "red";
+          saved.colour2 = "blue";
+        }
+        saved.colourDefaultsVersion = 1403;
+        localStorage.setItem("lipfty14-settings", JSON.stringify(saved));
+      }
+      return { ...defaultSettings(), ...saved };
+    } catch (_) { return defaultSettings(); }
   }
   let settings = loadSettings();
 
   function colourCss(c) { return COLOURS[c === "black" ? settings.colour1 : settings.colour2][1]; }
   function colourName(c) { return COLOURS[c === "black" ? settings.colour1 : settings.colour2][0]; }
+
+  function hexToRgb(hex) {
+    const value = hex.replace("#", "");
+    return { r: parseInt(value.slice(0,2),16), g: parseInt(value.slice(2,4),16), b: parseInt(value.slice(4,6),16) };
+  }
+  function rgbToHex({r,g,b}) {
+    const part = value => Math.max(0, Math.min(255, Math.round(value))).toString(16).padStart(2,"0");
+    return `#${part(r)}${part(g)}${part(b)}`;
+  }
+  function mixHex(a, b, amount) {
+    const ca = hexToRgb(a), cb = hexToRgb(b);
+    return rgbToHex({
+      r: ca.r + (cb.r-ca.r)*amount,
+      g: ca.g + (cb.g-ca.g)*amount,
+      b: ca.b + (cb.b-ca.b)*amount
+    });
+  }
+  function relativeLuminance(hex) {
+    const {r,g,b} = hexToRgb(hex);
+    const channel = value => {
+      const c = value / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126*channel(r) + 0.7152*channel(g) + 0.0722*channel(b);
+  }
   function applyColours() {
-    document.documentElement.style.setProperty("--piece-black", colourCss("black"));
-    document.documentElement.style.setProperty("--piece-white", colourCss("white"));
+    const first = colourCss("black"), second = colourCss("white");
+    document.documentElement.style.setProperty("--piece-black", first);
+    document.documentElement.style.setProperty("--piece-white", second);
+
+    // The board follows the selected Lipfty colours. Each square is a muted
+    // blend of both piece colours, so Black/White naturally becomes greyscale
+    // while Red/Blue becomes a subdued red-blue / violet board.
+    const blendA = mixHex(first, second, 0.38);
+    const blendB = mixHex(first, second, 0.62);
+    const neutral = "#808080";
+    const lightBase = mixHex(blendA, neutral, 0.30);
+    const darkBase = mixHex(blendB, neutral, 0.38);
+    const light = mixHex(lightBase, "#ffffff", 0.62);
+    const dark = mixHex(darkBase, "#000000", 0.28);
+    const frame = mixHex(mixHex(first, second, 0.50), "#000000", 0.58);
+    document.documentElement.style.setProperty("--board-light", light);
+    document.documentElement.style.setProperty("--board-dark", dark);
+    document.documentElement.style.setProperty("--board-frame", frame);
+    document.documentElement.style.setProperty("--piece-black-outline", relativeLuminance(first) < 0.34 ? "rgba(255,255,255,.72)" : "rgba(0,0,0,.62)");
+    document.documentElement.style.setProperty("--piece-white-outline", relativeLuminance(second) < 0.34 ? "rgba(255,255,255,.72)" : "rgba(0,0,0,.62)");
   }
   function isComputer(p) { return settings.mode === "computer" && p === 1; }
   function playerName(p) { return isComputer(p) ? "Computer" : (p === 0 ? "Player 1" : "Player 2"); }
@@ -624,13 +681,13 @@
     e.preventDefault();
     const c1=el("setting-colour1").value,c2=el("setting-colour2").value;
     if(c1===c2){el("settings-error").textContent="Choose two different colours.";return;}
-    settings={mode:el("setting-mode").value,level:el("setting-level").value,version:el("setting-version").value,starter:el("setting-starter").value,colour1:c1,colour2:c2,undo:el("setting-undo").checked};
+    settings={mode:el("setting-mode").value,level:el("setting-level").value,version:el("setting-version").value,starter:el("setting-starter").value,colour1:c1,colour2:c2,colourDefaultsVersion:1403,undo:el("setting-undo").checked};
     localStorage.setItem("lipfty14-settings",JSON.stringify(settings)); settingsDialog.close(); startGame();
   });
 
   fetch("./build-info.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(info=>{
-    el("version").textContent=`v${info?.version || "14.0.2"}`;
-  }).catch(()=>el("version").textContent="v14.0.2");
+    el("version").textContent=`v${info?.version || "14.0.3"}`;
+  }).catch(()=>el("version").textContent="v14.0.3");
 
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
     navigator.serviceWorker.register("service-worker.js", { scope: "./" }).catch(()=>{});
