@@ -325,7 +325,24 @@
     state.colourChooser = placer;
     state.choosingColour = true;
     state.assignedColour = null;
-    if (state.openingPlaced >= 4) state.phase = "main";
+    if (state.openingPlaced >= 4) {
+      state.phase = "main";
+      render(); processFlow();
+      return;
+    }
+
+    // v14.0.4: after three Opening Four placements there is exactly one
+    // colour and one corner left. There is no decision to make, so complete
+    // that final setup placement immediately for either a human or computer.
+    const remainingAnchors = ANCHORS.filter(i => !state.board[i]);
+    const remainingColours = ["black","white"].filter(c => state.openingRemaining[c] > 0);
+    if (remainingAnchors.length === 1 && remainingColours.length === 1) {
+      state.assignedColour = remainingColours[0];
+      state.choosingColour = false;
+      placeOpening(remainingAnchors[0]);
+      return;
+    }
+
     render(); processFlow();
   }
 
@@ -686,8 +703,8 @@
   });
 
   fetch("./build-info.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(info=>{
-    el("version").textContent=`v${info?.version || "14.0.3"}`;
-  }).catch(()=>el("version").textContent="v14.0.3");
+    el("version").textContent=`v${info?.version || "14.0.4"}`;
+  }).catch(()=>el("version").textContent="v14.0.4");
 
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
     navigator.serviceWorker.register("service-worker.js", { scope: "./" }).catch(()=>{});
