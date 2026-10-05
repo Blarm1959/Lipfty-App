@@ -32,27 +32,35 @@
   let state;
   let history = [];
   let timer = null;
+  let clockInterval = null;
+  let clockRemainingMs = [0, 0];
+  let clockActivePlayer = null;
+  let clockLastTick = null;
+  let resultRecorded = false;
 
   function defaultSettings() {
-    return { mode: "computer", level: "standard", version: "standard", starter: "random", colour1: "red", colour2: "blue", colourDefaultsVersion: 1403, undo: true };
+    return {
+      mode: "computer", level: "standard", version: "standard", starter: "random",
+      player1: "Player", player2: "Player 2", colour1: "red", colour2: "blue",
+      clockMinutes: 0, clockIncrement: 0, sound: true, animations: true, language: "en-GB",
+      undo: true, colourDefaultsVersion: 1403
+    };
   }
   function loadSettings() {
     try {
       const saved = JSON.parse(localStorage.getItem("lipfty14-settings") || "{}");
-      // v14.0.3 restores Red / Blue as the Lipfty default. Existing installs
-      // that are still on the old v14.0.2 Black / White default migrate once;
-      // later explicit colour choices are preserved by the marker below.
       if (saved.colourDefaultsVersion !== 1403) {
         if ((saved.colour1 === undefined || saved.colour1 === "black") &&
             (saved.colour2 === undefined || saved.colour2 === "white")) {
-          saved.colour1 = "red";
-          saved.colour2 = "blue";
+          saved.colour1 = "red"; saved.colour2 = "blue";
         }
         saved.colourDefaultsVersion = 1403;
-        localStorage.setItem("lipfty14-settings", JSON.stringify(saved));
       }
       return { ...defaultSettings(), ...saved };
     } catch (_) { return defaultSettings(); }
+  }
+  function saveSettings() {
+    try { localStorage.setItem("lipfty14-settings", JSON.stringify(settings)); } catch (_) {}
   }
   let settings = loadSettings();
 
@@ -84,29 +92,15 @@
     return 0.2126*channel(r) + 0.7152*channel(g) + 0.0722*channel(b);
   }
   function applyColours() {
-    const first = colourCss("black"), second = colourCss("white");
-    document.documentElement.style.setProperty("--piece-black", first);
-    document.documentElement.style.setProperty("--piece-white", second);
-
-    // The board follows the selected Lipfty colours. Each square is a muted
-    // blend of both piece colours, so Black/White naturally becomes greyscale
-    // while Red/Blue becomes a subdued red-blue / violet board.
-    const blendA = mixHex(first, second, 0.38);
-    const blendB = mixHex(first, second, 0.62);
-    const neutral = "#808080";
-    const lightBase = mixHex(blendA, neutral, 0.30);
-    const darkBase = mixHex(blendB, neutral, 0.38);
-    const light = mixHex(lightBase, "#ffffff", 0.62);
-    const dark = mixHex(darkBase, "#000000", 0.28);
-    const frame = mixHex(mixHex(first, second, 0.50), "#000000", 0.58);
-    document.documentElement.style.setProperty("--board-light", light);
-    document.documentElement.style.setProperty("--board-dark", dark);
-    document.documentElement.style.setProperty("--board-frame", frame);
-    document.documentElement.style.setProperty("--piece-black-outline", relativeLuminance(first) < 0.34 ? "rgba(255,255,255,.72)" : "rgba(0,0,0,.62)");
-    document.documentElement.style.setProperty("--piece-white-outline", relativeLuminance(second) < 0.34 ? "rgba(255,255,255,.72)" : "rgba(0,0,0,.62)");
+    document.documentElement.style.setProperty("--piece-black", colourCss("black"));
+    document.documentElement.style.setProperty("--piece-white", colourCss("white"));
   }
   function isComputer(p) { return settings.mode === "computer" && p === 1; }
-  function playerName(p) { return isComputer(p) ? "Computer" : (p === 0 ? "Player 1" : "Player 2"); }
+  function playerName(p) {
+    if (isComputer(p)) return "Computer";
+    if (settings.mode === "computer") return settings.player1 || "Player";
+    return p === 0 ? (settings.player1 || "Player 1") : (settings.player2 || "Player 2");
+  }
   function other(p) { return p === 0 ? 1 : 0; }
 
   function shuffled(a) {
@@ -127,8 +121,14 @@
   }
 
   function chooseStarter() {
-    if (settings.starter === "p1") return 0;
-    if (settings.starter === "p2") return 1;
+    if (settings.starter === "player") return 0;
+    if (settings.starter === "computer") return 1;
+    if (settings.starter === "alternate") {
+      const previous = localStorage.getItem("lipfty14-last-starter") || "computer";
+      const next = previous === "player" ? "computer" : "player";
+      localStorage.setItem("lipfty14-last-starter", next);
+      return next === "player" ? 0 : 1;
+    }
     return Math.random() < 0.5 ? 0 : 1;
   }
 
@@ -178,13 +178,16 @@
   }
   function checkpoint() {
     if (!settings.undo || state.winner !== null) return;
-    history.push(cloneState(state));
+    settleClock();
+    history.push({ state: cloneState(state), clock: { remainingMs: [...clockRemainingMs], activePlayer: clockActivePlayer } });
     if (history.length > 60) history.shift();
   }
   function undo() {
     if (!settings.undo || !history.length || isComputer(state.currentPlayer)) return;
     clearTimeout(timer);
-    state = history.pop();
+    const snap = history.pop();
+    state = snap.state;
+    restoreClock(snap.clock);
     render(); processFlow();
   }
 
@@ -222,6 +225,7 @@
     state.winType = w.type;
     state.choosingColour = false;
     state.selectedBoardIndex = null;
+    stopClock(); maybeRecordResult(); playTone("win");
     render();
     return true;
   }
@@ -314,6 +318,7 @@
     if (state.winner !== null) return;
     state.winner = "draw";
     state.choosingColour = false;
+    stopClock(); maybeRecordResult();
     render();
   }
 
@@ -331,7 +336,7 @@
       return;
     }
 
-    // v14.0.4: after three Opening Four placements there is exactly one
+    // v14.0.5: after three Opening Four placements there is exactly one
     // colour and one corner left. There is no decision to make, so complete
     // that final setup placement immediately for either a human or computer.
     const remainingAnchors = ANCHORS.filter(i => !state.board[i]);
@@ -575,13 +580,16 @@
 
   function processFlow() {
     clearTimeout(timer);
+    syncClock();
     if (state.winner !== null) return;
+    const shortDelay = settings.animations ? 180 : 0;
+    const playDelay = settings.animations ? 420 : 0;
     if (state.pendingSwap) {
-      if (isComputer(state.pendingSwap.decider)) timer = setTimeout(()=>resolveSwap(Math.random()<0.5),180);
+      if (isComputer(state.pendingSwap.decider)) timer = setTimeout(()=>resolveSwap(Math.random()<0.5), shortDelay);
       return;
     }
-    if (state.choosingColour && isComputer(state.colourChooser)) { timer = setTimeout(computerChooseColour,180); return; }
-    if (!state.choosingColour && isComputer(state.currentPlayer)) { timer = setTimeout(computerPlay,220); }
+    if (state.choosingColour && isComputer(state.colourChooser)) { timer = setTimeout(computerChooseColour, shortDelay); return; }
+    if (!state.choosingColour && isComputer(state.currentPlayer)) { timer = setTimeout(computerPlay, playDelay); }
   }
 
   function statusText() {
@@ -648,6 +656,15 @@
     statusEl.textContent = statusText() + (state.lastReleaseMessage ? ` ${state.lastReleaseMessage}.` : "");
     state.lastReleaseMessage = "";
 
+    const versionTitle = settings.version === "learning" ? "Learning" : settings.version === "extreme" ? "Extreme" : "Standard";
+    el("quick-rules-title").textContent = `Lipfty · ${versionTitle}`;
+    el("quick-win-rule").innerHTML = settings.version === "extreme"
+      ? "<strong>Win:</strong> four in a line, or a tight/spaced Square."
+      : "<strong>Win:</strong> make four in a horizontal, vertical or diagonal line.";
+    el("phase-help").textContent = state.phase === "opening"
+      ? `Opening Four · ${state.openingPlaced}/4 placed. The opponent chooses the colour; the player chooses the corner.`
+      : `${reserveTotal()} reserve pieces remain · ${state.releasedCorners.filter(Boolean).length}/4 outer corners released.`;
+
     blackBtn.querySelector("strong").textContent=colourName("black");
     whiteBtn.querySelector("strong").textContent=colourName("white");
     const blackCount = state.phase==="opening" ? state.openingRemaining.black : reserveCount("black");
@@ -675,40 +692,104 @@
   }
 
   function startGame() {
-    clearTimeout(timer); nextPieceId=1; history=[]; state=freshState(); applyColours(); render(); processFlow();
+    clearTimeout(timer); resultRecorded=false; nextPieceId=1; history=[]; state=freshState(); applyColours(); initialiseClock(); render(); processFlow();
   }
 
-  blackBtn.addEventListener("click",()=>chooseColour("black"));
-  whiteBtn.addEventListener("click",()=>chooseColour("white"));
+  function playTone(kind="move") {
+    if (!settings.sound || !("AudioContext" in window || "webkitAudioContext" in window)) return;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new Ctx(), osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.frequency.value = kind === "win" ? 660 : 360;
+      gain.gain.setValueAtTime(.025, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + (kind === "win" ? .22 : .08));
+      osc.connect(gain); gain.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + (kind === "win" ? .22 : .08));
+      osc.addEventListener("ended", () => ctx.close());
+    } catch (_) {}
+  }
+
+  function clockEnabled(){ return Number(settings.clockMinutes) > 0; }
+  function decisionActor(){ if (!state || state.winner!==null) return null; if(state.pendingSwap) return state.pendingSwap.decider; return state.choosingColour ? state.colourChooser : state.currentPlayer; }
+  function formatClock(ms){ const total=Math.max(0,Math.ceil(ms/1000)); return `${Math.floor(total/60)}:${String(total%60).padStart(2,"0")}`; }
+  function stopClock(){ if(clockInterval) clearInterval(clockInterval); clockInterval=null; clockActivePlayer=null; clockLastTick=null; renderClocks(); }
+  function settleClock(now=Date.now()){
+    if(!clockEnabled() || clockActivePlayer===null || clockLastTick===null || state?.winner!==null) return null;
+    const elapsed=Math.max(0,now-clockLastTick); clockRemainingMs[clockActivePlayer]=Math.max(0,clockRemainingMs[clockActivePlayer]-elapsed); clockLastTick=now;
+    return clockRemainingMs[clockActivePlayer] <= 0 ? clockActivePlayer : null;
+  }
+  function initialiseClock(){ if(clockInterval) clearInterval(clockInterval); const initial=clockEnabled()?Number(settings.clockMinutes)*60000:0; clockRemainingMs=[initial,initial]; clockActivePlayer=null; clockLastTick=null; renderClocks(); }
+  function restoreClock(snap){ if(clockInterval) clearInterval(clockInterval); const initial=clockEnabled()?Number(settings.clockMinutes)*60000:0; clockRemainingMs=snap?.remainingMs?[...snap.remainingMs]:[initial,initial]; clockActivePlayer=Number.isInteger(snap?.activePlayer)?snap.activePlayer:null; clockLastTick=clockActivePlayer===null?null:Date.now(); }
+  function finishTimeLoss(expired){ if(!state || state.winner!==null) return; clockRemainingMs[expired]=0; state.winner=other(expired); state.winType="time"; state.choosingColour=false; if(clockInterval) clearInterval(clockInterval); clockInterval=null; clockActivePlayer=null; clockLastTick=null; maybeRecordResult(); playTone("win"); render(); }
+  function syncClock(){
+    if(!clockEnabled()){ if(clockInterval) clearInterval(clockInterval); clockInterval=null; clockActivePlayer=null; clockLastTick=null; renderClocks(); return; }
+    const now=Date.now(), expired=settleClock(now); if(expired!==null){finishTimeLoss(expired);return;}
+    const next=decisionActor(); if(next!==clockActivePlayer){ if(clockActivePlayer!==null) clockRemainingMs[clockActivePlayer]+=Math.max(0,Number(settings.clockIncrement)||0)*1000; clockActivePlayer=next; }
+    clockLastTick=clockActivePlayer===null?null:now;
+    if(!clockInterval && clockActivePlayer!==null) clockInterval=setInterval(()=>{const e=settleClock(); if(e!==null) finishTimeLoss(e); else renderClocks();},250);
+    renderClocks();
+  }
+  function renderClocks(){
+    const panel=el("chess-clocks"), row=document.querySelector(".turn-status-row"); if(!panel) return; const enabled=clockEnabled(); panel.hidden=!enabled; row?.classList.toggle("chess-clock-enabled",enabled); if(!enabled) return;
+    for(let p=0;p<2;p++){ el(`clock-player-${p}-name`).textContent=playerName(p); el(`clock-player-${p}`).textContent=formatClock(clockRemainingMs[p]); const card=panel.querySelector(`[data-clock-player="${p}"]`); card?.classList.toggle("chess-clock-card--active",clockActivePlayer===p&&state?.winner===null); card?.classList.toggle("chess-clock-card--expired",clockRemainingMs[p]<=0); }
+  }
+
+  const STATS_KEY="lipfty14-stats";
+  function emptyStats(){return{computer:{played:0,won:0,lost:0,drawn:0},two:{played:0,p1:0,p2:0,drawn:0}};}
+  function loadStats(){try{const x=JSON.parse(localStorage.getItem(STATS_KEY)||"null"),b=emptyStats();return x?{computer:{...b.computer,...x.computer},two:{...b.two,...x.two}}:b;}catch(_){return emptyStats();}}
+  function maybeRecordResult(){
+    if(resultRecorded||state?.winner===null)return; resultRecorded=true; const stats=loadStats();
+    if(settings.mode==="computer"){const x=stats.computer;x.played++;if(state.winner==="draw")x.drawn++;else if(state.winner===0)x.won++;else x.lost++;}
+    else{const x=stats.two;x.played++;if(state.winner==="draw")x.drawn++;else if(state.winner===0)x.p1++;else x.p2++;}
+    try{localStorage.setItem(STATS_KEY,JSON.stringify(stats));}catch(_){}
+  }
+  function renderStatistics(){const stats=loadStats(),box=el("statistics-content"),tile=(v,l)=>`<span><strong>${v}</strong><small>${l}</small></span>`;box.innerHTML=`<h3>Against the computer</h3><div class="statistics-summary">${tile(stats.computer.played,"Played")}${tile(stats.computer.won,"You won")}${tile(stats.computer.lost,"Computer won")}${tile(stats.computer.drawn,"Draws")}</div><h3>Two players</h3><div class="statistics-summary">${tile(stats.two.played,"Played")}${tile(stats.two.p1,"Player 1 won")}${tile(stats.two.p2,"Player 2 won")}${tile(stats.two.drawn,"Draws")}</div>`;}
+
+  function jumpToEndTest(){
+    clearTimeout(timer); resultRecorded=false; nextPieceId=1; history=[]; state=freshState();
+    state.phase="main"; state.openingPlaced=4; state.openingRemaining={black:0,white:0}; state.swapDone=true;
+    state.board=Array(36).fill(null);
+    [[0,"black"],[5,"white"],[30,"white"],[35,"black"]].forEach(([i,c])=>state.board[i]={id:nextPieceId++,colour:c,pinned:true,special:true,anchor:true});
+    const fallback=[[1,"black"],[2,"white"],[3,"white"],[4,"black"],[8,"black"],[11,"white"],[12,"black"],[14,"white"],[15,"black"],[16,"black"],[17,"white"],[19,"black"],[20,"black"],[21,"white"],[22,"white"],[23,"black"],[24,"white"],[25,"white"],[26,"white"],[27,"black"],[29,"white"],[31,"black"],[33,"black"],[34,"white"]];
+    fallback.forEach(([i,c])=>state.board[i]={id:nextPieceId++,colour:c,pinned:false,special:false,anchor:false});
+    state.reserve.active.fill(null); state.clearedEdges=[true,true,true,true]; [0,1,2,3].forEach(releaseCorner); state.releasedCorners=[true,true,true,true];
+    state.currentPlayer=0; state.colourChooser=0; state.choosingColour=true; state.assignedColour=null; state.selectedReserveIndex=null;
+    initialiseClock(); render(); processFlow();
+  }
+
+  blackBtn.addEventListener("click",()=>{playTone();chooseColour("black");});
+  whiteBtn.addEventListener("click",()=>{playTone();chooseColour("white");});
   el("carry-on").addEventListener("click",()=>resolveSwap(false));
   el("swap-sides").addEventListener("click",()=>resolveSwap(true));
   el("choose-handed").addEventListener("click",()=>applyJumpChoice(state.consequence.heldColour));
   el("choose-jumped").addEventListener("click",()=>applyJumpChoice(state.consequence.jumpedPiece.colour));
-  el("new-game").addEventListener("click",startGame);
-  undoBtn.addEventListener("click",undo);
+  el("new-game").addEventListener("click",startGame); undoBtn.addEventListener("click",undo);
 
-  const settingsDialog=el("settings-dialog");
-  el("settings-button").addEventListener("click",()=>{
-    el("setting-mode").value=settings.mode; el("setting-level").value=settings.level; el("setting-version").value=settings.version;
-    el("setting-starter").value=settings.starter; el("setting-colour1").value=settings.colour1; el("setting-colour2").value=settings.colour2;
-    el("setting-undo").checked=settings.undo; settingsDialog.showModal();
-  });
-  el("settings-cancel").addEventListener("click",()=>settingsDialog.close());
-  el("settings-form").addEventListener("submit",e=>{
-    e.preventDefault();
-    const c1=el("setting-colour1").value,c2=el("setting-colour2").value;
-    if(c1===c2){el("settings-error").textContent="Choose two different colours.";return;}
-    settings={mode:el("setting-mode").value,level:el("setting-level").value,version:el("setting-version").value,starter:el("setting-starter").value,colour1:c1,colour2:c2,colourDefaultsVersion:1403,undo:el("setting-undo").checked};
-    localStorage.setItem("lipfty14-settings",JSON.stringify(settings)); settingsDialog.close(); startGame();
-  });
+  let versionTaps=[]; function handleVersionTap(){const now=Date.now();versionTaps=versionTaps.filter(t=>now-t<=3000);versionTaps.push(now);if(versionTaps.length>=5){versionTaps=[];jumpToEndTest();}}
+  [el("app-version"),el("mobile-version")].filter(Boolean).forEach(x=>x.addEventListener("click",handleVersionTap));
 
-  fetch("./build-info.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(info=>{
-    el("version").textContent=`v${info?.version || "14.0.4"}`;
-  }).catch(()=>el("version").textContent="v14.0.4");
+  const settingsDialog=el("settings-dialog"),settingsForm=el("settings-form"),wizardSteps=[...document.querySelectorAll("[data-wizard-step]")],wizardIndicators=[...document.querySelectorAll("[data-step-indicator]")];
+  const wizardBack=el("wizard-back"),wizardNext=el("wizard-next"),wizardSave=el("wizard-save"),wizardDefault=el("wizard-default"); let wizardStep=0;
+  const colourOptions=["red","blue","green","yellow","purple","orange","black","white"];
+  function buildColours(id,name){const box=el(id);box.replaceChildren();for(const k of colourOptions){const l=document.createElement("label");l.className="colour-choice";l.innerHTML=`<input type="radio" name="${name}" value="${k}"><span><i class="colour-swatch" style="background:${COLOURS[k][1]}"></i>${COLOURS[k][0]}</span>`;box.appendChild(l);}}
+  buildColours("colour1-choices","colour1");buildColours("colour2-choices","colour2");
+  function fv(n){return settingsForm.querySelector(`[name="${n}"]:checked`)?.value;} function sr(n,v){const x=settingsForm.querySelector(`[name="${n}"][value="${v}"]`);if(x)x.checked=true;}
+  function syncMode(){const one=fv("gameMode")==="computer";el("difficulty-field").hidden=!one;el("player2-label").hidden=one;el("player1-label-text").textContent=one?"Player name":"Player 1 name";el("starter-player-label").textContent=one?"Player":"Player 1";el("starter-other-label").textContent=one?"Computer":"Player 2";}
+  function syncDifficulty(){const n=Number(el("difficulty-input").value),names=["","Beginner","Standard","Expert"];el("difficulty-name").textContent=`${n} · ${names[n]}`;}
+  function syncClockOptions(){const enabled=Number(fv("clockMinutes")||0)>0;el("clock-increment-field").disabled=!enabled;if(!enabled)sr("clockIncrement","0");}
+  function showStep(n){wizardStep=Math.max(0,Math.min(5,n));wizardSteps.forEach((x,i)=>x.hidden=i!==wizardStep);wizardIndicators.forEach((x,i)=>{x.classList.toggle("wizard-progress-step--active",i===wizardStep);x.classList.toggle("wizard-progress-step--complete",i<wizardStep);});wizardDefault.hidden=wizardStep!==0;wizardBack.hidden=wizardStep===0;wizardNext.hidden=wizardStep===5;wizardSave.hidden=false;if(wizardStep===5)summary();}
+  function summary(){const one=fv("gameMode")==="computer",mins=Number(fv("clockMinutes")||0),inc=Number(fv("clockIncrement")||0),clock=mins?`${mins} min each${inc?` + ${inc}s`:""}`:"Clock off";el("setup-summary").textContent=`Lipfty · ${one?"Player vs Computer":"Two players"} · ${COLOURS[fv("colour1")][0]} / ${COLOURS[fv("colour2")][0]} · ${(fv("gameVersion")||"standard").replace(/^./,c=>c.toUpperCase())} · ${clock}`;}
+  function loadForm(){sr("gameMode",settings.mode);el("difficulty-input").value=settings.level==="beginner"?1:settings.level==="expert"?3:2;sr("allowUndo",settings.undo?"yes":"no");sr("colour1",settings.colour1);sr("colour2",settings.colour2);sr("gameVersion",settings.version);el("setting-player1").value=settings.player1||"Player";el("setting-player2").value=settings.player2||"Player 2";sr("starter",settings.starter);sr("clockMinutes",String(settings.clockMinutes||0));sr("clockIncrement",String(settings.clockIncrement||0));el("setting-sound").checked=settings.sound!==false;el("setting-animations").checked=settings.animations!==false;el("setting-language").value=settings.language||"en-GB";syncMode();syncDifficulty();syncClockOptions();showStep(0);}
+  function setDefaultForm(){const d=defaultSettings();sr("gameMode",d.mode);el("difficulty-input").value=2;sr("allowUndo","yes");sr("colour1","red");sr("colour2","blue");sr("gameVersion","standard");el("setting-player1").value="Player";el("setting-player2").value="Player 2";sr("starter","random");sr("clockMinutes","0");sr("clockIncrement","0");el("setting-sound").checked=true;el("setting-animations").checked=true;syncMode();syncDifficulty();syncClockOptions();}
+  function commitSettings(){const c1=fv("colour1"),c2=fv("colour2");if(!c1||!c2||c1===c2){showStep(1);statusEl.textContent="Choose two different piece colours.";return false;}const n=Number(el("difficulty-input").value);settings={...settings,mode:fv("gameMode"),level:n===1?"beginner":n===3?"expert":"standard",version:fv("gameVersion")||"standard",starter:fv("starter")||"random",player1:el("setting-player1").value.trim()||"Player",player2:el("setting-player2").value.trim()||"Player 2",colour1:c1,colour2:c2,clockMinutes:Number(fv("clockMinutes")||0),clockIncrement:Number(fv("clockIncrement")||0),sound:el("setting-sound").checked,animations:el("setting-animations").checked,language:el("setting-language").value,undo:fv("allowUndo")==="yes",colourDefaultsVersion:1403};saveSettings();settingsDialog.close();startGame();return true;}
+  el("settings-button").addEventListener("click",()=>{loadForm();settingsDialog.showModal();});el("close-settings").addEventListener("click",()=>settingsDialog.close());wizardBack.addEventListener("click",()=>showStep(wizardStep-1));wizardNext.addEventListener("click",()=>{if(wizardStep===1&&fv("colour1")===fv("colour2")){statusEl.textContent="Choose two different piece colours.";return;}showStep(wizardStep+1);});wizardDefault.addEventListener("click",setDefaultForm);settingsForm.addEventListener("submit",e=>{e.preventDefault();commitSettings();});
+  wizardIndicators.forEach((x,i)=>{x.setAttribute("role","button");x.tabIndex=0;x.addEventListener("click",()=>showStep(i));x.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();showStep(i);}});});
+  settingsForm.querySelectorAll('[name="gameMode"]').forEach(x=>x.addEventListener("change",syncMode));el("difficulty-input").addEventListener("input",syncDifficulty);settingsForm.querySelectorAll('[name="clockMinutes"]').forEach(x=>x.addEventListener("change",syncClockOptions));
 
-  if ("serviceWorker" in navigator && location.protocol !== "file:") {
-    navigator.serviceWorker.register("service-worker.js", { scope: "./" }).catch(()=>{});
-  }
+  el("help-button").addEventListener("click",()=>el("help-dialog").showModal());el("close-help").addEventListener("click",()=>el("help-dialog").close());
+  el("view-statistics-button").addEventListener("click",()=>{renderStatistics();el("statistics-dialog").showModal();});el("close-statistics").addEventListener("click",()=>el("statistics-dialog").close());el("reset-statistics").addEventListener("click",()=>{if(confirm("Reset all Lipfty statistics on this device?")){localStorage.removeItem(STATS_KEY);renderStatistics();}});
+
+  fetch("./build-info.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(info=>{const v=info?.version||"14.0.5";el("app-version").textContent=`Version ${v}`;el("mobile-version").textContent=`v${v}`;const ref=info?.commit||info?.gitCommit||"";el("build-reference").textContent=ref?` · ${String(ref).slice(0,7)}`:"";}).catch(()=>{el("app-version").textContent="Version 14.0.5";});
+  if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("service-worker.js",{scope:"./"}).catch(()=>{});
 
   startGame();
 })();
