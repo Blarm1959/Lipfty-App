@@ -1,4 +1,4 @@
-const VERSION = "14.0.5";
+const VERSION = "14.0.6";
 const CACHE = `lipfty-v${VERSION}`;
 const ASSETS = ["./","./index.html","./css/style.css","./css/lipfty8-layout.css","./js/rules.js","./js/app.js","./manifest.json","./package.json","./build-info.json"];
 self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
