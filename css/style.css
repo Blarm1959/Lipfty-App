@@ -15,7 +15,9 @@ html.animations-off .winner{animation:none}
 .reserve-button.reserve-button--required:disabled{opacity:1;border-color:#24639c;border-width:3px;background:#edf5ff;box-shadow:0 0 0 2px rgba(36,91,150,.12);color:var(--ink)}
 .reserve-button--required strong::after{content:" · To use"}
 .reserve-button.reserve-button--opening-available:disabled{opacity:1;color:var(--ink)}
-.reserve-cell--setup .piece{opacity:.3;filter:grayscale(1)}
+.reserve-cell--setup .piece{opacity:.35;filter:none}
+.piece--locked{filter:none}
 .opening-corner-target{box-shadow:inset 0 0 0 3px #245b96}
-.opening-corner-target::after{width:30%;background:#245b96}
+.opening-corner-target::after{display:none}
+.opening-piece-preview{opacity:.5;border-style:dashed;box-shadow:none}
 

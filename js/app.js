@@ -828,6 +828,9 @@
         if (state.phase==="opening" && ANCHORS.includes(index) && !state.board[index] && !state.choosingColour) {
           btn.classList.add("place-target", "opening-corner-target");
           btn.setAttribute("aria-label", `Place ${colourName(state.assignedColour)} Opening Four piece here`);
+          const preview = renderPiece(state.assignedColour, true);
+          preview.classList.add("opening-piece-preview");
+          btn.appendChild(preview);
         }
         if (state.selectedBoardIndex===index) btn.classList.add("selected");
         if (state.legalMoves.has(index)) btn.classList.add("move-target");
