@@ -12,3 +12,6 @@ dialog{border:0;border-radius:20px;padding:0;box-shadow:0 24px 70px rgba(15,36,5
 @media(max-width:560px){.app-header h1{font-size:1.8rem}.icon-button{width:40px;height:40px}.turn-message-card{padding:6px 9px}.reserve-panel{padding:8px}.reserve-button{min-height:50px;padding:4px 6px}.reserve-button .piece{width:30px}.rules-panel{display:none}.board-frame{width:100%;border-width:3px}.board-note{display:none}.setup-wizard-dialog{width:100%;max-width:none;margin:auto 0 0;border-radius:22px 22px 0 0}.setup-wizard-dialog form{padding:14px;max-height:90dvh}.wizard-progress{gap:5px}.wizard-progress-line{height:2px}.wizard-progress-step{min-width:34px;height:34px;padding:0 8px;border-width:2px;font-size:.9rem}.colour-choice-grid{grid-template-columns:repeat(2,1fr)}.colour-choice span{padding:7px;font-size:.8rem}.colour-swatch{width:26px;height:26px}.wizard-actions .button{flex:1}.statistics-summary{grid-template-columns:repeat(2,1fr)}}
 
 html.animations-off .winner{animation:none}
+.reserve-button.reserve-button--required:disabled{opacity:1;border-color:#24639c;border-width:3px;background:#edf5ff;box-shadow:0 0 0 2px rgba(36,91,150,.12);color:var(--ink)}
+.reserve-button--required strong::after{content:" · To use"}
+

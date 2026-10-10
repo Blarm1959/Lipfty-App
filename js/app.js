@@ -789,7 +789,8 @@
     if (state.consequence?.type === "jump-choice" && state.choosingColour) return `${playerName(state.currentPlayer)}: choose which piece you will place after the Jump.`;
     if (state.choosingColour) return `${playerName(state.colourChooser)}: choose a reserve piece/colour for ${playerName(state.currentPlayer)}.`;
     if (state.redeployPiece) return `${playerName(state.currentPlayer)}: place the jumped ${colourName(state.redeployPiece.colour)} piece on any empty square.`;
-    if (state.consequence?.type === "move" && state.consequence.step === 2) return `${playerName(state.currentPlayer)}: now place the piece you were originally handed.`;
+    if (state.consequence?.type === "move" && state.consequence.step === 2) return `${playerName(state.currentPlayer)}: now place the originally handed ${colourName(state.assignedColour)} piece on any empty square.`;
+    if (!canMoveOrJump()) return `${playerName(state.currentPlayer)}: place the ${colourName(state.assignedColour)} piece on any empty square.`;
     return `${playerName(state.currentPlayer)}: Place, Move or Jump using ${colourName(state.assignedColour)}.`;
   }
 
@@ -837,7 +838,7 @@
 
   function render() {
     applyColours();
-    currentEl.textContent = state.winner===null ? playerName(state.currentPlayer) : "Game over";
+    currentEl.textContent = state.winner===null ? playerName(decisionActor()) : "Game over";
     statusEl.textContent = statusText() + (state.lastReleaseMessage ? ` ${state.lastReleaseMessage}.` : "");
     state.lastReleaseMessage = "";
 
@@ -860,6 +861,28 @@
     whiteBtn.disabled = !state.choosingColour || isComputer(state.colourChooser) || !availableChoiceColours().includes("white") || !!state.pendingSwap;
     blackBtn.querySelector(".mini-piece").style.background=colourCss("black");
     whiteBtn.querySelector(".mini-piece").style.background=colourCss("white");
+
+    // A fixed colour is an instruction, even though its button cannot be clicked.
+    const activeColour = state.winner === null && !state.pendingSwap && !state.choosingColour
+      ? (state.redeployPiece?.colour || state.assignedColour) : null;
+    const jumpChoice = state.consequence?.type === "jump-choice" && state.choosingColour;
+    el("reserve-heading").textContent = state.winner !== null ? "Colours"
+      : state.pendingSwap ? "Position decision"
+      : state.choosingColour ? (jumpChoice ? "Choose piece to place" : "Choose a colour")
+      : "Colour to use";
+    for (const [colour, button] of [["black", blackBtn], ["white", whiteBtn]]) {
+      const required = activeColour === colour;
+      button.classList.toggle("reserve-button--required", required);
+      button.setAttribute("aria-label", `${colourName(colour)}${required ? ": colour to use" : ""}`);
+      button.querySelector(".mini-piece").classList.toggle("piece--special",
+        state.phase === "opening" || (required && !!state.redeployPiece?.special) ||
+        (required && state.selectedReserveIndex !== null && CORNERS.includes(state.selectedReserveIndex)));
+      if (required) button.querySelector("small").textContent = state.redeployPiece
+        ? "Place jumped piece" : state.phase === "opening" ? "Place Opening Four piece"
+        : canMoveOrJump() ? "Use this colour" : "Place this piece";
+      else if (jumpChoice) button.querySelector("small").textContent =
+        colour === state.consequence.heldColour ? "Originally handed piece" : "Jumped piece";
+    }
 
     reserveInfoEl.textContent = state.phase === "opening"
       ? "Four shaped starter pieces: 2 of each colour. The opponent chooses the colour; the player chooses the corner."
@@ -1026,3 +1049,4 @@
   registerServiceWorker();
   startGame();
 })();
+

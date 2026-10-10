@@ -1,11 +1,11 @@
 {
   "name": "lipfty",
-  "version": "15.0.1",
+  "version": "15.0.2",
   "description": "Lipfty shared-piece strategy game",
   "private": true,
   "scripts": {
     "start": "http-server -p 8005 -c-1 .",
-    "test": "node tools/test-rules.js",
+    "test": "node tools/test-rules.js \u0026\u0026 node tools/test-colour-cues.js",
     "test:play": "node tools/test-play.js"
   },
   "devDependencies": {
