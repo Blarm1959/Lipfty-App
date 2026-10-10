@@ -1,11 +1,12 @@
 {
   "name": "lipfty",
-  "version": "14.0.6",
+  "version": "14.0.7",
   "description": "Lipfty shared-piece strategy game",
   "private": true,
   "scripts": {
     "start": "http-server -p 8005 -c-1 .",
-    "test": "node tools/test-rules.js"
+    "test": "node tools/test-rules.js",
+    "test:play": "node tools/test-play.js"
   },
   "devDependencies": {
     "http-server": "14.1.1"

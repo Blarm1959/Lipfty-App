@@ -3,7 +3,7 @@
 
   const R = window.LipftyRules;
   const CORNERS = [0, 7, 56, 63];
-  const ANCHORS = [0, 5, 30, 35];
+  const ANCHORS = [...R.ANCHOR_SQUARES];
   const EDGE_DEFS = [
     { name: "top", cells: [1,2,3,4,5,6], corners: [0,1] },
     { name: "right", cells: [15,23,31,39,47,55], corners: [1,3] },
@@ -21,7 +21,6 @@
   const statusEl = el("status");
   const currentEl = el("current-player");
   const reserveInfoEl = el("reserve-info");
-  const phaseEl = el("phase-label");
   const blackBtn = el("choose-black");
   const whiteBtn = el("choose-white");
   const undoBtn = el("undo");
@@ -67,33 +66,10 @@
   function colourCss(c) { return COLOURS[c === "black" ? settings.colour1 : settings.colour2][1]; }
   function colourName(c) { return COLOURS[c === "black" ? settings.colour1 : settings.colour2][0]; }
 
-  function hexToRgb(hex) {
-    const value = hex.replace("#", "");
-    return { r: parseInt(value.slice(0,2),16), g: parseInt(value.slice(2,4),16), b: parseInt(value.slice(4,6),16) };
-  }
-  function rgbToHex({r,g,b}) {
-    const part = value => Math.max(0, Math.min(255, Math.round(value))).toString(16).padStart(2,"0");
-    return `#${part(r)}${part(g)}${part(b)}`;
-  }
-  function mixHex(a, b, amount) {
-    const ca = hexToRgb(a), cb = hexToRgb(b);
-    return rgbToHex({
-      r: ca.r + (cb.r-ca.r)*amount,
-      g: ca.g + (cb.g-ca.g)*amount,
-      b: ca.b + (cb.b-ca.b)*amount
-    });
-  }
-  function relativeLuminance(hex) {
-    const {r,g,b} = hexToRgb(hex);
-    const channel = value => {
-      const c = value / 255;
-      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-    };
-    return 0.2126*channel(r) + 0.7152*channel(g) + 0.0722*channel(b);
-  }
   function applyColours() {
     document.documentElement.style.setProperty("--piece-black", colourCss("black"));
     document.documentElement.style.setProperty("--piece-white", colourCss("white"));
+    document.documentElement.classList.toggle("animations-off", settings.animations === false);
   }
   function isComputer(p) { return settings.mode === "computer" && p === 1; }
   function playerName(p) {
@@ -227,6 +203,7 @@
     state.selectedBoardIndex = null;
     stopClock(); maybeRecordResult(); playTone("win");
     render();
+    maybeOfferUpdate();
     return true;
   }
 
@@ -320,6 +297,7 @@
     state.choosingColour = false;
     stopClock(); maybeRecordResult();
     render();
+    maybeOfferUpdate();
   }
 
   function afterOpeningPlacement(placer) {
@@ -336,7 +314,7 @@
       return;
     }
 
-    // v14.0.5: after three Opening Four placements there is exactly one
+    // After three Opening Four placements there is exactly one
     // colour and one corner left. There is no decision to make, so complete
     // that final setup placement immediately for either a human or computer.
     const remainingAnchors = ANCHORS.filter(i => !state.board[i]);
@@ -357,6 +335,7 @@
     const colour = state.assignedColour;
     if (!colour || state.openingRemaining[colour] <= 0) return;
     state.board[index] = { id: nextPieceId++, colour, pinned: true, special: true, anchor: true };
+    playTone("place");
     state.openingRemaining[colour] -= 1;
     state.openingPlaced += 1;
     state.assignedColour = null;
@@ -381,6 +360,7 @@
 
     if (state.redeployPiece) {
       state.board[index] = state.redeployPiece;
+      playTone("place");
       state.redeployPiece = null;
       if (finishWin()) return;
       const c = state.consequence;
@@ -402,6 +382,7 @@
     const piece = consumeReserve(sourceIndex);
     if (!piece) return;
     state.board[index] = piece;
+    playTone("place");
     state.selectedReserveIndex = null;
     state.assignedColour = null;
     clearSelection();
@@ -470,6 +451,7 @@
     const piece = state.board[from];
     state.board[from] = null;
     state.board[to] = piece;
+    playTone(isJump ? "jump" : "move");
     clearSelection();
     if (finishWin()) return;
 
@@ -527,55 +509,256 @@
     chooseColour(colour, displayIndex);
   }
 
-  function computerChooseColour() {
-    if (!isComputer(state.colourChooser) || !state.choosingColour) return;
-    if (state.consequence?.type === "jump-choice") {
-      const c = state.consequence;
-      const choices = [c.heldColour, c.jumpedPiece.colour];
-      applyJumpChoice(choices[Math.floor(Math.random()*choices.length)]); return;
+  function winOptions(inactiveWinCells = blockedAnchors()) {
+    return { ...ruleOptions(), inactiveWinCells };
+  }
+
+  function blockedAnchorsAfterReserveRemoval(index) {
+    if (index === null || index === undefined) return blockedAnchors();
+    const released = [...state.releasedCorners];
+    EDGE_DEFS.forEach((edge, edgeIndex) => {
+      if (state.clearedEdges[edgeIndex]) return;
+      if (edge.cells.every(i => i === index || !state.reserve.active[i])) {
+        edge.corners.forEach(slot => { released[slot] = true; });
+      }
+    });
+    return ANCHORS.filter((_, slot) => !released[slot]);
+  }
+
+  function patternsFor(options) {
+    const blocked = new Set(options.inactiveWinCells || []);
+    const patterns = [...R.ORTHOGONAL_LINES, ...R.DIAGONAL_LINES];
+    if (options.allowSquare) patterns.push(...(options.allowSpacedSquare ? R.AXIS_SQUARES : R.TIGHT_SQUARES));
+    return patterns.filter(pattern => !pattern.some(i => blocked.has(i)));
+  }
+
+  function patternProgress(board, colour, inactiveWinCells = blockedAnchors()) {
+    const weights = [0, 1, 5, 24, 5000];
+    let score = 0;
+    for (const pattern of patternsFor(winOptions(inactiveWinCells))) {
+      let own = 0, blocked = false;
+      for (const index of pattern) {
+        const piece = board[index];
+        if (!piece) continue;
+        if (piece.colour !== colour) { blocked = true; break; }
+        own += 1;
+      }
+      if (!blocked) score += weights[own];
     }
-    const colours = availableChoiceColours();
-    if (!colours.length) { finishDraw(); return; }
-    chooseColour(colours[Math.floor(Math.random()*colours.length)]);
+    return score;
+  }
+
+  function countImmediatePlacementWins(board, colour, inactiveWinCells = blockedAnchors()) {
+    const options = winOptions(inactiveWinCells);
+    let wins = 0;
+    for (let to = 0; to < 36; to += 1) {
+      if (board[to]) continue;
+      const copy = [...board];
+      copy[to] = { colour };
+      if (R.checkWin(copy, options)) wins += 1;
+    }
+    return wins;
+  }
+
+  function centreScore(index) {
+    const r = Math.floor(index / 6), c = index % 6;
+    return 6 - (Math.abs(r - 2.5) + Math.abs(c - 2.5));
+  }
+
+  function boardAfterAction(action, removeJumped = false) {
+    const board = state.board.map(piece => piece ? { ...piece } : null);
+    if (action.type === "place") {
+      board[action.to] = { colour: state.assignedColour };
+    } else {
+      const piece = board[action.from];
+      board[action.from] = null;
+      board[action.to] = piece;
+      if (removeJumped && action.type === "jump") board[action.over] = null;
+    }
+    return board;
+  }
+
+  function actionInactiveWinCells(action) {
+    return action.type === "place"
+      ? blockedAnchorsAfterReserveRemoval(state.selectedReserveIndex)
+      : blockedAnchors();
   }
 
   function actionWouldWin(action) {
-    const b = state.board.map(p => p ? {...p} : null);
-    if (action.type === "place") b[action.to] = { colour: state.assignedColour };
-    else {
-      const p = b[action.from]; b[action.from] = null; b[action.to] = p;
-      if (action.type === "jump") b[action.over] = null;
+    // The live game checks a Move/Jump win immediately after the moving piece
+    // lands, before a jumped piece is removed. Mirror that exact timing here.
+    return !!R.checkWin(boardAfterAction(action, false), winOptions(actionInactiveWinCells(action)));
+  }
+
+  function enumerateComputerActions() {
+    const actions = [];
+    if (state.selectedReserveIndex !== null) {
+      for (let to = 0; to < 36; to += 1) if (!state.board[to]) actions.push({ type:"place", to });
     }
-    return !!R.checkWin(b, ruleOptions());
+    if (!canMoveOrJump()) return actions;
+    for (let from = 0; from < 36; from += 1) {
+      const piece = state.board[from];
+      if (!piece || piece.colour !== state.assignedColour || piece.pinned || piece.id === state.protectedPieceId) continue;
+      R.adjacentDestinations(state.board, from).forEach(to => actions.push({ type:"move", from, to }));
+      R.jumpDestinations(state.board, from)
+        .filter(j => state.board[j.over] && !state.board[j.over].pinned && state.board[j.over].colour !== piece.colour)
+        .forEach(j => actions.push({ type:"jump", from, to:j.to, over:j.over }));
+    }
+    return actions;
+  }
+
+  function positionalActionScore(action, expert = false) {
+    const board = boardAfterAction(action, true);
+    const inactive = actionInactiveWinCells(action);
+    let score = patternProgress(board, state.assignedColour, inactive) * 6 + centreScore(action.to);
+    if (action.type === "jump") score += 2;
+    else if (action.type === "move") score += 1;
+
+    if (expert) {
+      const risks = ["black","white"].map(colour => countImmediatePlacementWins(board, colour, inactive));
+      // After an ordinary placement the computer will choose the opponent's
+      // next colour, so it can select the safer colour. After Move/Jump the
+      // responder chooses for themselves, so assume they take the more dangerous one.
+      const receiverRisk = action.type === "place" ? Math.min(...risks) : Math.max(...risks);
+      score -= receiverRisk * 900;
+    }
+    return score;
+  }
+
+  function chooseBestByScore(items, scoreOf, highest = true) {
+    if (!items.length) return null;
+    let bestScore = highest ? -Infinity : Infinity;
+    let best = [];
+    for (const item of items) {
+      const score = scoreOf(item);
+      const better = highest ? score > bestScore : score < bestScore;
+      if (better) { bestScore = score; best = [item]; }
+      else if (score === bestScore) best.push(item);
+    }
+    return best[Math.floor(Math.random() * best.length)];
+  }
+
+  function computerChooseColour() {
+    if (!isComputer(state.colourChooser) || !state.choosingColour) return;
+
+    if (state.phase === "opening") {
+      const colours = availableChoiceColours();
+      if (!colours.length) { finishDraw(); return; }
+      chooseColour(colours[Math.floor(Math.random() * colours.length)]);
+      return;
+    }
+
+    if (state.consequence?.type === "jump-choice") {
+      const c = state.consequence;
+      const choices = [c.heldColour, c.jumpedPiece.colour];
+      if (settings.level === "beginner") {
+        applyJumpChoice(choices[Math.floor(Math.random() * choices.length)]);
+        return;
+      }
+      const chosen = chooseBestByScore(choices, colour =>
+        countImmediatePlacementWins(state.board, colour) * 1000 +
+        (settings.level === "expert" ? patternProgress(state.board, colour) : 0), true);
+      applyJumpChoice(chosen);
+      return;
+    }
+
+    const colours = availableChoiceColours();
+    if (!colours.length) { finishDraw(); return; }
+    if (settings.level === "beginner") {
+      chooseColour(colours[Math.floor(Math.random() * colours.length)]);
+      return;
+    }
+
+    // During the first Move consequence the chooser is also the player who
+    // places the selected reserve piece, so maximise their opportunity. On a
+    // normal handover the computer is choosing for its opponent, so minimise it.
+    const selfPlacement = state.consequence?.type === "move" && state.consequence.step === 1 && state.currentPlayer === state.colourChooser;
+    const exclude = state.consequence?.type === "move" ? state.consequence.heldIndex : null;
+
+    if (settings.level === "standard") {
+      const chosenColour = chooseBestByScore(colours, colour => {
+        const wins = countImmediatePlacementWins(state.board, colour);
+        return wins * 1000 + patternProgress(state.board, colour);
+      }, selfPlacement);
+      chooseColour(chosenColour);
+      return;
+    }
+
+    // Expert also chooses the exact physical reserve piece. That matters in
+    // Lipfty 14 because lifting the final piece from an edge can release both
+    // corners before the selected piece is placed.
+    const candidates = [];
+    for (const colour of colours) {
+      for (const index of activeReserveIndices(colour, exclude)) candidates.push({ colour, index });
+    }
+    const chosen = chooseBestByScore(candidates, option => {
+      const inactive = blockedAnchorsAfterReserveRemoval(option.index);
+      const wins = countImmediatePlacementWins(state.board, option.colour, inactive);
+      const progress = patternProgress(state.board, option.colour, inactive);
+      return wins * 1000 + progress;
+    }, selfPlacement);
+    if (chosen) chooseColour(chosen.colour, chosen.index);
   }
 
   function computerPlay() {
     if (!isComputer(state.currentPlayer) || state.choosingColour || state.winner !== null) return;
     if (state.phase === "opening") {
       const choices = ANCHORS.filter(i => !state.board[i]);
-      placeOpening(choices[Math.floor(Math.random()*choices.length)]); return;
+      placeOpening(choices[Math.floor(Math.random()*choices.length)]);
+      return;
     }
+
     if (state.redeployPiece) {
-      const empties = state.board.map((p,i)=>p?null:i).filter(i=>i!==null);
-      placePiece(empties[Math.floor(Math.random()*empties.length)]); return;
-    }
-    const actions = [];
-    for (let i=0;i<36;i++) if (!state.board[i] && state.selectedReserveIndex !== null) actions.push({type:"place",to:i});
-    if (canMoveOrJump()) {
-      for (let from=0;from<36;from++) {
-        const p=state.board[from];
-        if (!p || p.colour!==state.assignedColour || p.pinned || p.id===state.protectedPieceId) continue;
-        R.adjacentDestinations(state.board,from).forEach(to=>actions.push({type:"move",from,to}));
-        R.jumpDestinations(state.board,from).filter(j=>state.board[j.over]&&!state.board[j.over].pinned&&state.board[j.over].colour!==p.colour)
-          .forEach(j=>actions.push({type:"jump",from,to:j.to,over:j.over}));
+      const empties = state.board.map((piece,index) => piece ? null : index).filter(index => index !== null);
+      if (!empties.length) { finishDraw(); return; }
+      if (settings.level === "beginner") {
+        placePiece(empties[Math.floor(Math.random()*empties.length)]);
+        return;
       }
+      const colour = state.redeployPiece.colour;
+      const winning = empties.filter(to => {
+        const board = [...state.board]; board[to] = { colour };
+        return !!R.checkWin(board, ruleOptions());
+      });
+      const pool = winning.length ? winning : empties;
+      const chosen = winning.length ? pool[Math.floor(Math.random()*pool.length)] :
+        chooseBestByScore(pool, to => {
+          const board = [...state.board]; board[to] = { colour };
+          return patternProgress(board, colour) * 6 + centreScore(to);
+        }, true);
+      placePiece(chosen);
+      return;
     }
+
+    const actions = enumerateComputerActions();
     if (!actions.length) { finishDraw(); return; }
+    if (settings.level === "beginner") {
+      const action = actions[Math.floor(Math.random()*actions.length)];
+      if (action.type === "place") placePiece(action.to);
+      else { selectBoardPiece(action.from); moveOrJump(action.to); }
+      return;
+    }
+
     const wins = actions.filter(actionWouldWin);
-    const pool = wins.length ? wins : actions;
-    const a = pool[Math.floor(Math.random()*pool.length)];
-    if (a.type === "place") placePiece(a.to);
-    else { selectBoardPiece(a.from); moveOrJump(a.to); }
+    const candidates = wins.length ? wins : actions;
+    const action = wins.length
+      ? candidates[Math.floor(Math.random()*candidates.length)]
+      : chooseBestByScore(candidates, candidate => positionalActionScore(candidate, settings.level === "expert"), true);
+    if (action.type === "place") placePiece(action.to);
+    else { selectBoardPiece(action.from); moveOrJump(action.to); }
+  }
+
+  function firstSquareStrength(index) {
+    if (!Number.isInteger(index)) return 0;
+    return patternsFor(ruleOptions()).filter(pattern => pattern.includes(index)).length;
+  }
+
+  function computerSwapDecision() {
+    if (!state.pendingSwap) return false;
+    if (settings.level === "beginner") return Math.random() < 0.5;
+    const strength = firstSquareStrength(state.pendingSwap.firstNormalIndex);
+    if (settings.level === "expert") return strength >= 7;
+    return strength >= 8;
   }
 
   function processFlow() {
@@ -585,7 +768,7 @@
     const shortDelay = settings.animations ? 180 : 0;
     const playDelay = settings.animations ? 420 : 0;
     if (state.pendingSwap) {
-      if (isComputer(state.pendingSwap.decider)) timer = setTimeout(()=>resolveSwap(Math.random()<0.5), shortDelay);
+      if (isComputer(state.pendingSwap.decider)) timer = setTimeout(()=>resolveSwap(computerSwapDecision()), shortDelay);
       return;
     }
     if (state.choosingColour && isComputer(state.colourChooser)) { timer = setTimeout(computerChooseColour, shortDelay); return; }
@@ -594,7 +777,10 @@
 
   function statusText() {
     if (state.winner === "draw") return "Draw — every reserve piece has been used without a win.";
-    if (state.winner !== null) return `${playerName(state.winner)} wins${state.winType === "square" ? " with a square" : " with four in a row"}.`;
+    if (state.winner !== null) {
+      if (state.winType === "time") return `${playerName(state.winner)} wins on time.`;
+      return `${playerName(state.winner)} wins${state.winType === "square" ? " with a square" : " with four in a row"}.`;
+    }
     if (state.pendingSwap) return `${playerName(state.pendingSwap.decider)}: accept the first placement or take the position?`;
     if (state.phase === "opening") {
       if (state.choosingColour) return `${playerName(state.colourChooser)}: choose the colour ${playerName(state.currentPlayer)} must place as an Opening Four piece.`;
@@ -652,7 +838,6 @@
   function render() {
     applyColours();
     currentEl.textContent = state.winner===null ? playerName(state.currentPlayer) : "Game over";
-    phaseEl.textContent = state.phase === "opening" ? `Opening Four · ${state.openingPlaced}/4 placed` : "Main game";
     statusEl.textContent = statusText() + (state.lastReleaseMessage ? ` ${state.lastReleaseMessage}.` : "");
     state.lastReleaseMessage = "";
 
@@ -700,10 +885,12 @@
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       const ctx = new Ctx(), osc = ctx.createOscillator(), gain = ctx.createGain();
-      osc.frequency.value = kind === "win" ? 660 : 360;
+      const frequencies = { select: 320, place: 380, move: 440, jump: 520, win: 660 };
+      const duration = kind === "win" ? .22 : kind === "jump" ? .14 : .08;
+      osc.frequency.value = frequencies[kind] || frequencies.select;
       gain.gain.setValueAtTime(.025, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + (kind === "win" ? .22 : .08));
-      osc.connect(gain); gain.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + (kind === "win" ? .22 : .08));
+      gain.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + duration);
+      osc.connect(gain); gain.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + duration);
       osc.addEventListener("ended", () => ctx.close());
     } catch (_) {}
   }
@@ -719,7 +906,12 @@
   }
   function initialiseClock(){ if(clockInterval) clearInterval(clockInterval); const initial=clockEnabled()?Number(settings.clockMinutes)*60000:0; clockRemainingMs=[initial,initial]; clockActivePlayer=null; clockLastTick=null; renderClocks(); }
   function restoreClock(snap){ if(clockInterval) clearInterval(clockInterval); const initial=clockEnabled()?Number(settings.clockMinutes)*60000:0; clockRemainingMs=snap?.remainingMs?[...snap.remainingMs]:[initial,initial]; clockActivePlayer=Number.isInteger(snap?.activePlayer)?snap.activePlayer:null; clockLastTick=clockActivePlayer===null?null:Date.now(); }
-  function finishTimeLoss(expired){ if(!state || state.winner!==null) return; clockRemainingMs[expired]=0; state.winner=other(expired); state.winType="time"; state.choosingColour=false; if(clockInterval) clearInterval(clockInterval); clockInterval=null; clockActivePlayer=null; clockLastTick=null; maybeRecordResult(); playTone("win"); render(); }
+  function finishTimeLoss(expired){
+    if(!state || state.winner!==null) return;
+    clockRemainingMs[expired]=0; state.winner=other(expired); state.winType="time"; state.choosingColour=false;
+    if(clockInterval) clearInterval(clockInterval); clockInterval=null; clockActivePlayer=null; clockLastTick=null;
+    maybeRecordResult(); playTone("win"); render(); maybeOfferUpdate();
+  }
   function syncClock(){
     if(!clockEnabled()){ if(clockInterval) clearInterval(clockInterval); clockInterval=null; clockActivePlayer=null; clockLastTick=null; renderClocks(); return; }
     const now=Date.now(), expired=settleClock(now); if(expired!==null){finishTimeLoss(expired);return;}
@@ -756,8 +948,8 @@
     initialiseClock(); render(); processFlow();
   }
 
-  blackBtn.addEventListener("click",()=>{playTone();chooseColour("black");});
-  whiteBtn.addEventListener("click",()=>{playTone();chooseColour("white");});
+  blackBtn.addEventListener("click",()=>{playTone("select");chooseColour("black");});
+  whiteBtn.addEventListener("click",()=>{playTone("select");chooseColour("white");});
   el("carry-on").addEventListener("click",()=>resolveSwap(false));
   el("swap-sides").addEventListener("click",()=>resolveSwap(true));
   el("choose-handed").addEventListener("click",()=>applyJumpChoice(state.consequence.heldColour));
@@ -779,7 +971,15 @@
   function showStep(n){wizardStep=Math.max(0,Math.min(5,n));wizardSteps.forEach((x,i)=>x.hidden=i!==wizardStep);wizardIndicators.forEach((x,i)=>{x.classList.toggle("wizard-progress-step--active",i===wizardStep);x.classList.toggle("wizard-progress-step--complete",i<wizardStep);});wizardDefault.hidden=wizardStep!==0;wizardBack.hidden=wizardStep===0;wizardNext.hidden=wizardStep===5;wizardSave.hidden=false;if(wizardStep===5)summary();}
   function summary(){const one=fv("gameMode")==="computer",mins=Number(fv("clockMinutes")||0),inc=Number(fv("clockIncrement")||0),clock=mins?`${mins} min each${inc?` + ${inc}s`:""}`:"Clock off";el("setup-summary").textContent=`Lipfty · ${one?"Player vs Computer":"Two players"} · ${COLOURS[fv("colour1")][0]} / ${COLOURS[fv("colour2")][0]} · ${(fv("gameVersion")||"standard").replace(/^./,c=>c.toUpperCase())} · ${clock}`;}
   function loadForm(){sr("gameMode",settings.mode);el("difficulty-input").value=settings.level==="beginner"?1:settings.level==="expert"?3:2;sr("allowUndo",settings.undo?"yes":"no");sr("colour1",settings.colour1);sr("colour2",settings.colour2);sr("gameVersion",settings.version);el("setting-player1").value=settings.player1||"Player";el("setting-player2").value=settings.player2||"Player 2";sr("starter",settings.starter);sr("clockMinutes",String(settings.clockMinutes||0));sr("clockIncrement",String(settings.clockIncrement||0));el("setting-sound").checked=settings.sound!==false;el("setting-animations").checked=settings.animations!==false;el("setting-language").value=settings.language||"en-GB";syncMode();syncDifficulty();syncClockOptions();showStep(0);}
-  function setDefaultForm(){const d=defaultSettings();sr("gameMode",d.mode);el("difficulty-input").value=2;sr("allowUndo","yes");sr("colour1","red");sr("colour2","blue");sr("gameVersion","standard");el("setting-player1").value="Player";el("setting-player2").value="Player 2";sr("starter","random");sr("clockMinutes","0");sr("clockIncrement","0");el("setting-sound").checked=true;el("setting-animations").checked=true;syncMode();syncDifficulty();syncClockOptions();}
+  function setDefaultForm(){
+    const d=defaultSettings();
+    sr("gameMode",d.mode); el("difficulty-input").value=d.level==="beginner"?1:d.level==="expert"?3:2;
+    sr("allowUndo",d.undo?"yes":"no"); sr("colour1",d.colour1); sr("colour2",d.colour2); sr("gameVersion",d.version);
+    el("setting-player1").value=d.player1; el("setting-player2").value=d.player2; sr("starter",d.starter);
+    sr("clockMinutes",String(d.clockMinutes)); sr("clockIncrement",String(d.clockIncrement));
+    el("setting-sound").checked=d.sound; el("setting-animations").checked=d.animations; el("setting-language").value=d.language;
+    syncMode(); syncDifficulty(); syncClockOptions();
+  }
   function commitSettings(){const c1=fv("colour1"),c2=fv("colour2");if(!c1||!c2||c1===c2){showStep(1);statusEl.textContent="Choose two different piece colours.";return false;}const n=Number(el("difficulty-input").value);settings={...settings,mode:fv("gameMode"),level:n===1?"beginner":n===3?"expert":"standard",version:fv("gameVersion")||"standard",starter:fv("starter")||"random",player1:el("setting-player1").value.trim()||"Player",player2:el("setting-player2").value.trim()||"Player 2",colour1:c1,colour2:c2,clockMinutes:Number(fv("clockMinutes")||0),clockIncrement:Number(fv("clockIncrement")||0),sound:el("setting-sound").checked,animations:el("setting-animations").checked,language:el("setting-language").value,undo:fv("allowUndo")==="yes",colourDefaultsVersion:1403};saveSettings();settingsDialog.close();startGame();return true;}
   el("settings-button").addEventListener("click",()=>{loadForm();settingsDialog.showModal();});el("close-settings").addEventListener("click",()=>settingsDialog.close());wizardBack.addEventListener("click",()=>showStep(wizardStep-1));wizardNext.addEventListener("click",()=>{if(wizardStep===1&&fv("colour1")===fv("colour2")){statusEl.textContent="Choose two different piece colours.";return;}showStep(wizardStep+1);});wizardDefault.addEventListener("click",setDefaultForm);settingsForm.addEventListener("submit",e=>{e.preventDefault();commitSettings();});
   wizardIndicators.forEach((x,i)=>{x.setAttribute("role","button");x.tabIndex=0;x.addEventListener("click",()=>showStep(i));x.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();showStep(i);}});});
@@ -788,8 +988,41 @@
   el("help-button").addEventListener("click",()=>el("help-dialog").showModal());el("close-help").addEventListener("click",()=>el("help-dialog").close());
   el("view-statistics-button").addEventListener("click",()=>{renderStatistics();el("statistics-dialog").showModal();});el("close-statistics").addEventListener("click",()=>el("statistics-dialog").close());el("reset-statistics").addEventListener("click",()=>{if(confirm("Reset all Lipfty statistics on this device?")){localStorage.removeItem(STATS_KEY);renderStatistics();}});
 
-  fetch("./build-info.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(info=>{const v=info?.version||"14.0.6";el("app-version").textContent=`Version ${v}`;el("mobile-version").textContent=`v${v}`;const ref=info?.commit||info?.gitCommit||"";el("build-reference").textContent=ref?` · ${String(ref).slice(0,7)}`:"";}).catch(()=>{el("app-version").textContent="Version 14.0.6";});
-  if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("service-worker.js",{scope:"./"}).catch(()=>{});
+  fetch("./build-info.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(info=>{const v=info?.version||"14.0.7";el("app-version").textContent=`Version ${v}`;el("mobile-version").textContent=`v${v}`;const ref=info?.commit||info?.gitCommit||"";el("build-reference").textContent=ref?` · ${String(ref).slice(0,7)}`:"";}).catch(()=>{el("app-version").textContent="Version 14.0.7";});
+  let pendingUpdateRegistration = null;
+  let updatePromptHandled = false;
+  let reloadingForUpdate = false;
+  function gameIsInProgress(){
+    return !!state && state.winner === null && (state.openingPlaced > 0 || state.board.some(Boolean) || reserveTotal() < 24);
+  }
+  function maybeOfferUpdate(){
+    const registration = pendingUpdateRegistration;
+    if (updatePromptHandled || !registration?.waiting || gameIsInProgress()) return;
+    updatePromptHandled = true;
+    if (confirm("A new version of Lipfty is available. Update now?")) {
+      registration.waiting.postMessage({type:"SKIP_WAITING"});
+    }
+  }
+  function registerServiceWorker(){
+    if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
+    navigator.serviceWorker.addEventListener("controllerchange",()=>{
+      if (reloadingForUpdate) return;
+      reloadingForUpdate = true;
+      location.reload();
+    });
+    navigator.serviceWorker.register("service-worker.js",{scope:"./"}).then(registration=>{
+      const rememberWaiting = () => { pendingUpdateRegistration = registration; maybeOfferUpdate(); };
+      if (registration.waiting) rememberWaiting();
+      registration.addEventListener("updatefound",()=>{
+        const worker = registration.installing;
+        if (!worker) return;
+        worker.addEventListener("statechange",()=>{
+          if (worker.state === "installed" && navigator.serviceWorker.controller) rememberWaiting();
+        });
+      });
+    }).catch(()=>{});
+  }
 
+  registerServiceWorker();
   startGame();
 })();
