@@ -809,6 +809,7 @@
       btn.classList.add((dr+dc)%2 ? "dark" : "light");
       if (!inner) {
         btn.classList.add("reserve-cell");
+        if (state.phase === "opening") btn.classList.add("reserve-cell--setup");
         const slot=CORNERS.indexOf(d), active=state.reserve.active[d], locked=state.reserve.locked[d];
         if (active) {
           btn.appendChild(renderPiece(active, slot>=0));
@@ -824,7 +825,10 @@
       } else {
         const r=dr-1,c=dc-1,index=r*6+c; btn.classList.add("play-cell");
         if (winning.has(index)) btn.classList.add("winner");
-        if (state.phase==="opening" && ANCHORS.includes(index) && !state.board[index] && !state.choosingColour) btn.classList.add("place-target");
+        if (state.phase==="opening" && ANCHORS.includes(index) && !state.board[index] && !state.choosingColour) {
+          btn.classList.add("place-target", "opening-corner-target");
+          btn.setAttribute("aria-label", `Place ${colourName(state.assignedColour)} Opening Four piece here`);
+        }
         if (state.selectedBoardIndex===index) btn.classList.add("selected");
         if (state.legalMoves.has(index)) btn.classList.add("move-target");
         if (state.legalJumps.has(index)) btn.classList.add("jump-target");
@@ -873,6 +877,8 @@
     for (const [colour, button] of [["black", blackBtn], ["white", whiteBtn]]) {
       const required = activeColour === colour;
       button.classList.toggle("reserve-button--required", required);
+      button.classList.toggle("reserve-button--opening-available",
+        state.phase === "opening" && state.winner === null && state.openingRemaining[colour] > 0);
       button.setAttribute("aria-label", `${colourName(colour)}${required ? ": colour to use" : ""}`);
       button.querySelector(".mini-piece").classList.toggle("piece--special",
         state.phase === "opening" || (required && !!state.redeployPiece?.special) ||
