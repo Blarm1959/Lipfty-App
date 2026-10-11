@@ -364,15 +364,17 @@
     afterOpeningPlacement(state.currentPlayer);
   }
 
-  function resolveSwap(swap) {
+  function resolveSwap(swap, exactIndex = null) {
     if (!state.pendingSwap) return;
+    if (exactIndex !== null && (swap || isComputer(state.pendingSwap.decider) || !state.reserve.active[exactIndex])) return;
     checkpoint();
     const { placer, decider } = state.pendingSwap;
     state.pendingSwap = null;
     state.currentPlayer = swap ? placer : decider;
     state.colourChooser = swap ? decider : placer;
-    state.choosingColour = true;
-    state.assignedColour = null;
+    state.choosingColour = exactIndex === null;
+    state.selectedReserveIndex = exactIndex;
+    state.assignedColour = exactIndex === null ? null : state.reserve.active[exactIndex];
     render(); processFlow();
   }
 
@@ -858,6 +860,11 @@
           const reservePiece = renderPiece(active, slot>=0);
           if (state.winner === null && !state.pendingSwap && !state.choosingColour && !state.redeployPiece && state.selectedReserveIndex === d) reservePiece.classList.add("piece--active-reserve");
           btn.appendChild(reservePiece);
+          if (state.winner===null && state.pendingSwap && !isComputer(state.pendingSwap.decider)) {
+            btn.classList.add("selectable"); reservePiece.classList.add("piece--available-reserve");
+            btn.setAttribute("aria-label", `Accept and select this ${colourName(active)} reserve piece`);
+            btn.addEventListener("click",()=>resolveSwap(false,d));
+          }
           if (state.choosingColour && state.phase==="main" && !isComputer(state.colourChooser) && availableChoiceColours().includes(active)) {
             const held=state.consequence?.type==="move"?state.consequence.heldIndex:null;
             if (d!==held) { btn.classList.add("selectable"); reservePiece.classList.add("piece--available-reserve"); btn.addEventListener("click",()=>chooseExactReserve(d)); }
@@ -878,8 +885,16 @@
         if (state.legalMoves.has(index)) btn.classList.add("move-target");
         if (state.legalJumps.has(index)) btn.classList.add("jump-target");
         if (state.winner === null && !state.pendingSwap && state.phase==="main" && !state.choosingColour && state.selectedBoardIndex === null && !state.board[index] && (state.selectedReserveIndex!==null || state.redeployPiece)) btn.classList.add("place-target");
-        const p=state.board[index]; if (p) btn.appendChild(renderPiece(p.colour,p.special));
-        btn.addEventListener("click",()=>handleInner(index));
+        const p=state.board[index];
+        if (p) {
+          const boardPiece=renderPiece(p.colour,p.special);
+          if (state.winner===null && state.pendingSwap?.firstNormalIndex===index) boardPiece.classList.add("piece--active-reserve");
+          btn.appendChild(boardPiece);
+        }
+        if (state.winner===null && state.pendingSwap?.firstNormalIndex===index && !isComputer(state.pendingSwap.decider)) {
+          btn.setAttribute("aria-label", "Take position — keep the first ordinary piece here");
+          btn.addEventListener("click",()=>resolveSwap(true));
+        } else btn.addEventListener("click",()=>handleInner(index));
       }
       boardEl.appendChild(btn);
     }
@@ -942,7 +957,9 @@
         colour === state.consequence.heldColour ? "Originally handed piece" : "Jumped piece";
     }
 
-    reserveInfoEl.textContent = state.phase === "opening"
+    reserveInfoEl.textContent = state.pendingSwap
+      ? "Click the flashing board piece to Take position, or an available outside piece to Accept and select it to play next. The first placement stays where it is."
+      : state.phase === "opening"
       ? "Two same-colour special pieces at each outside corner. The chosen top piece flashes; dots mark where it can be placed."
       : state.redeployPiece ? `Place the jumped ${colourName(state.redeployPiece.colour)} piece on a dotted square.`
       : "The chosen reserve piece flashes until placed. Select a board piece to show its Move/Jump destinations; select it again to return to placement.";
