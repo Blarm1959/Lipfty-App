@@ -332,25 +332,24 @@
       return;
     }
 
-    // After three Opening Four placements there is exactly one
-    // colour and one corner left. There is no decision to make, so complete
-    // that final setup placement immediately for either a human or computer.
+    // Once only one colour remains, the remaining corners have the same
+    // final contents whichever source/corner is used first. Complete setup.
     const remainingAnchors = ANCHORS.filter(i => !state.board[i]);
     const remainingColours = ["black","white"].filter(c => state.openingRemaining[c] > 0);
-    if (remainingAnchors.length === 1 && remainingColours.length === 1) {
+    if (remainingAnchors.length > 0 && remainingColours.length === 1) {
       state.assignedColour = remainingColours[0];
       state.selectedOpeningIndex = CORNERS.find(i => state.openingReserve[i] === remainingColours[0]);
       state.choosingColour = false;
-      placeOpening(remainingAnchors[0]);
+      placeOpening(remainingAnchors[0], true);
       return;
     }
 
     render(); processFlow();
   }
 
-  function placeOpening(index) {
+  function placeOpening(index, automatic = false) {
     if (state.phase !== "opening" || state.choosingColour || !ANCHORS.includes(index) || state.board[index]) return;
-    checkpoint();
+    if (!automatic) checkpoint();
     const colour = state.assignedColour;
     if (!colour || state.openingRemaining[colour] <= 0) return;
     if (state.selectedOpeningIndex === null || state.openingReserve[state.selectedOpeningIndex] !== colour) return;
