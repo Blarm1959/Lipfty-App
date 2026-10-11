@@ -49,6 +49,7 @@
 
         <aside class="stage-info-card" id="stage-info-card">
           <p class="panel-help" id="phase-help">Opening Four setup.</p>
+          <p class="placement-alert" id="placement-alert" hidden></p>
         </aside>
 
         <section class="board-section">
@@ -69,18 +70,18 @@
 
         <aside class="rules-panel rules-panel--quick">
           <h2 id="quick-rules-title">Lipfty · Standard</h2>
-          <p id="quick-opening-rule"><strong>Opening:</strong> four shaped pieces are placed on the inner 6×6 corners. The opponent chooses the colour; the player chooses the corner.</p>
+          <p id="quick-opening-rule"><strong>Opening:</strong> two same-colour special pieces start stacked at each outside corner. The opponent chooses a top piece; the player places it on an empty inner 6×6 corner. Bottom pieces stay locked.</p>
           <p><strong>Your turn:</strong> use the reserve colour handed to you to <strong>Place</strong>, <strong>Move</strong> one adjacent square, or make one opposite-colour <strong>Jump</strong>.</p>
           <p id="quick-win-rule"><strong>Win:</strong> make four in a horizontal, vertical or diagonal line.</p>
           <p><strong>Corner release:</strong> clear all six ordinary pieces from an outside edge to release both end corners and activate their matching Opening Four pieces.</p>
-          <p class="panel-help"><strong>?</strong> opens the complete Lipfty 14 rules.</p>
+          <p class="panel-help"><strong>?</strong> opens the complete Lipfty rules.</p>
         </aside>
       </section>
 
       <section class="action-bar">
         <div class="action-bar-left"><button class="button button--primary" id="new-game" type="button">New game</button></div>
         <div class="action-bar-centre"><button class="button button--secondary" id="undo" type="button">Undo</button></div>
-        <div class="build-info"><span id="app-version">Version 14.0.7</span><span id="build-reference"></span></div>
+        <div class="build-info"><span id="app-version">Version 15.0.5</span><span id="build-reference"></span></div>
       </section>
     </main>
   </div>
@@ -147,9 +148,9 @@
 
   <dialog id="statistics-dialog"><div class="dialog-heading"><div><p class="dialog-eyebrow">Lipfty</p><h2>Statistics</h2></div><button class="dialog-close" id="close-statistics" type="button">×</button></div><div id="statistics-content" class="statistics-content"></div><div class="dialog-actions"><button class="button button--secondary" id="reset-statistics" type="button">Reset statistics</button></div></dialog>
 
-  <dialog id="help-dialog"><div class="dialog-heading"><div><p class="dialog-eyebrow">How to play</p><h2>Lipfty 14</h2></div><button class="dialog-close" id="close-help" type="button" aria-label="Close">×</button></div><div class="rules-copy">
+  <dialog id="help-dialog"><div class="dialog-heading"><div><p class="dialog-eyebrow">How to play</p><h2>Lipfty</h2></div><button class="dialog-close" id="close-help" type="button" aria-label="Close">×</button></div><div class="rules-copy">
     <p><strong>Objective.</strong> Make a winning pattern on the inner 6×6. Pieces are shared rather than owned by either player.</p>
-    <p><strong>Opening Four.</strong> Four shaped pieces, two of each colour, are placed on the four inner corners. The opponent chooses the colour; the player chooses the corner. The fourth forced placement is automatic.</p>
+    <p><strong>Opening Four.</strong> Start with two same-colour special pieces stacked at each physical board corner: two Red stacks and two Blue stacks (or your chosen colours). The opponent chooses a top piece; the player places it on any empty corner of the inner 6×6. The bottom piece stays locked at its outside corner. The fourth forced placement is automatic.</p>
     <p><strong>First normal placement.</strong> After the Opening Four, the starter places the first ordinary reserve piece. The other player then chooses <strong>Accept</strong> or <strong>Take position</strong>.</p>
     <p><strong>Corner rule.</strong> An Opening Four piece is blocked from every winning pattern while its matching outer corner is locked.</p>
     <p><strong>Release rule.</strong> When all six ordinary reserve pieces on an outside edge have gone, both special corner pieces at the ends of that edge are released. Their matching Opening Four pieces immediately become active for all winning patterns.</p>
@@ -164,3 +165,4 @@
   <script src="js/app.js"></script>
 </body>
 </html>
+

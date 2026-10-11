@@ -11,9 +11,9 @@
     { name: "left", cells: [8,16,24,32,40,48], corners: [0,2] }
   ];
   const COLOURS = {
-    black: ["Black", "#1d1d1d"], white: ["White", "#f7f7f2"],
+    black: ["Black", "#1d1d1d"], white: ["White", "#f8f8f4"],
     red: ["Red", "#d6423a"], blue: ["Blue", "#2d65ad"], green: ["Green", "#318653"],
-    yellow: ["Yellow", "#dba92f"], purple: ["Purple", "#7955a6"], orange: ["Orange", "#d97832"]
+    yellow: ["Yellow", "#e2ad34"], purple: ["Purple", "#7955a6"], orange: ["Orange", "#d97832"]
   };
 
   const el = id => document.getElementById(id);
@@ -110,10 +110,13 @@
 
   function freshState() {
     const starter = chooseStarter();
+    const reserve = freshReserve();
     return {
       phase: "opening",
       board: Array(36).fill(null),
-      reserve: freshReserve(),
+      reserve,
+      openingReserve: reserve.locked.map(colour => colour),
+      selectedOpeningIndex: null,
       releasedCorners: [false,false,false,false],
       clearedEdges: [false,false,false,false],
       openingRemaining: { black: 2, white: 2 },
@@ -143,6 +146,7 @@
       ...s,
       board: s.board.map(p => p ? {...p} : null),
       reserve: { active: [...s.reserve.active], locked: [...s.reserve.locked] },
+      openingReserve: [...s.openingReserve],
       releasedCorners: [...s.releasedCorners], clearedEdges: [...s.clearedEdges],
       openingRemaining: {...s.openingRemaining},
       legalMoves: new Set(s.legalMoves), legalJumps: new Map(s.legalJumps),
@@ -252,6 +256,9 @@
     checkpoint();
 
     if (state.phase === "opening") {
+      const sources = CORNERS.filter(index => state.openingReserve[index] === colour);
+      if (!sources.length || (exactIndex !== null && !sources.includes(exactIndex))) return;
+      state.selectedOpeningIndex = exactIndex !== null ? exactIndex : sources[Math.floor(Math.random() * sources.length)];
       state.assignedColour = colour;
       state.choosingColour = false;
       render(); processFlow(); return;
@@ -321,6 +328,7 @@
     const remainingColours = ["black","white"].filter(c => state.openingRemaining[c] > 0);
     if (remainingAnchors.length === 1 && remainingColours.length === 1) {
       state.assignedColour = remainingColours[0];
+      state.selectedOpeningIndex = CORNERS.find(i => state.openingReserve[i] === remainingColours[0]);
       state.choosingColour = false;
       placeOpening(remainingAnchors[0]);
       return;
@@ -334,6 +342,9 @@
     checkpoint();
     const colour = state.assignedColour;
     if (!colour || state.openingRemaining[colour] <= 0) return;
+    if (state.selectedOpeningIndex === null || state.openingReserve[state.selectedOpeningIndex] !== colour) return;
+    state.openingReserve[state.selectedOpeningIndex] = null;
+    state.selectedOpeningIndex = null;
     state.board[index] = { id: nextPieceId++, colour, pinned: true, special: true, anchor: true };
     playTone("place");
     state.openingRemaining[colour] -= 1;
@@ -433,6 +444,7 @@
     if (!canMoveOrJump() || state.choosingColour || state.winner !== null) return;
     const p = state.board[index];
     if (!p || p.colour !== state.assignedColour || p.pinned || p.id === state.protectedPieceId) return;
+    if (state.selectedBoardIndex === index) { clearSelection(); render(); return; }
     state.selectedBoardIndex = index;
     state.legalMoves = new Set(R.adjacentDestinations(state.board,index));
     state.legalJumps = new Map(R.jumpDestinations(state.board,index)
@@ -499,12 +511,13 @@
     if (state.choosingColour) return;
     if (state.selectedBoardIndex !== null && (state.legalMoves.has(index) || state.legalJumps.has(index))) { moveOrJump(index); return; }
     if (state.board[index]) { selectBoardPiece(index); return; }
+    if (state.selectedBoardIndex !== null) return;
     placePiece(index);
   }
 
   function chooseExactReserve(displayIndex) {
-    if (state.phase !== "main" || !state.choosingColour || state.winner !== null || isComputer(state.colourChooser)) return;
-    const colour = state.reserve.active[displayIndex];
+    if (!state.choosingColour || state.winner !== null || isComputer(state.colourChooser)) return;
+    const colour = state.phase === "opening" ? state.openingReserve[displayIndex] : state.reserve.active[displayIndex];
     if (!colour) return;
     chooseColour(colour, displayIndex);
   }
@@ -811,8 +824,28 @@
         btn.classList.add("reserve-cell");
         if (state.phase === "opening") btn.classList.add("reserve-cell--setup");
         const slot=CORNERS.indexOf(d), active=state.reserve.active[d], locked=state.reserve.locked[d];
+        const openingTop = state.phase === "opening" ? state.openingReserve[d] : null;
+        if (openingTop) {
+          btn.classList.add("corner-stack");
+          const bottom = renderPiece(locked, true, true);
+          bottom.classList.add("piece--stack-bottom");
+          btn.appendChild(bottom);
+          const top = renderPiece(openingTop, true);
+          top.classList.add("piece--stack-top");
+          if (state.winner === null && !state.choosingColour && state.selectedOpeningIndex === d) top.classList.add("piece--active-reserve");
+          btn.appendChild(top);
+          btn.setAttribute("aria-label", `Two ${colourName(openingTop)} special pieces; top piece for Opening Four`);
+          if (state.choosingColour && state.winner === null && !isComputer(state.colourChooser)) {
+            btn.classList.add("selectable");
+            btn.addEventListener("click", () => chooseExactReserve(d));
+          }
+          boardEl.appendChild(btn);
+          continue;
+        }
         if (active) {
-          btn.appendChild(renderPiece(active, slot>=0));
+          const reservePiece = renderPiece(active, slot>=0);
+          if (state.winner === null && !state.pendingSwap && !state.choosingColour && !state.redeployPiece && state.selectedReserveIndex === d) reservePiece.classList.add("piece--active-reserve");
+          btn.appendChild(reservePiece);
           if (state.choosingColour && state.phase==="main" && !isComputer(state.colourChooser) && availableChoiceColours().includes(active)) {
             const held=state.consequence?.type==="move"?state.consequence.heldIndex:null;
             if (d!==held) { btn.classList.add("selectable"); btn.addEventListener("click",()=>chooseExactReserve(d)); }
@@ -828,14 +861,11 @@
         if (state.phase==="opening" && ANCHORS.includes(index) && !state.board[index] && !state.choosingColour) {
           btn.classList.add("place-target", "opening-corner-target");
           btn.setAttribute("aria-label", `Place ${colourName(state.assignedColour)} Opening Four piece here`);
-          const preview = renderPiece(state.assignedColour, true);
-          preview.classList.add("opening-piece-preview");
-          btn.appendChild(preview);
         }
         if (state.selectedBoardIndex===index) btn.classList.add("selected");
         if (state.legalMoves.has(index)) btn.classList.add("move-target");
         if (state.legalJumps.has(index)) btn.classList.add("jump-target");
-        if (state.phase==="main" && !state.choosingColour && !state.board[index] && (state.selectedReserveIndex!==null || state.redeployPiece)) btn.classList.add("place-target");
+        if (state.winner === null && !state.pendingSwap && state.phase==="main" && !state.choosingColour && state.selectedBoardIndex === null && !state.board[index] && (state.selectedReserveIndex!==null || state.redeployPiece)) btn.classList.add("place-target");
         const p=state.board[index]; if (p) btn.appendChild(renderPiece(p.colour,p.special));
         btn.addEventListener("click",()=>handleInner(index));
       }
@@ -855,8 +885,15 @@
       ? "<strong>Win:</strong> four in a line, or a tight/spaced Square."
       : "<strong>Win:</strong> make four in a horizontal, vertical or diagonal line.";
     el("phase-help").textContent = state.phase === "opening"
-      ? `Opening Four · ${state.openingPlaced}/4 placed. The opponent chooses the colour; the player chooses the corner.`
+      ? `Opening Four · ${state.openingPlaced}/4 placed. Choose a top piece from an outside corner stack for the opponent to place on an empty inner 6×6 corner. The bottom piece stays locked.`
       : `${reserveTotal()} reserve pieces remain · ${state.releasedCorners.filter(Boolean).length}/4 outer corners released.`;
+    const consequence = state.consequence;
+    const compulsory = consequence
+      ? (consequence.type === "move" ? (consequence.step === 1 ? 2 : 1)
+        : ["jump-choice", "jump-redeploy-first", "jump-held-first"].includes(consequence.type) ? 2 : 1)
+      : 0;
+    el("placement-alert").hidden = compulsory === 0 || state.winner !== null;
+    el("placement-alert").textContent = `COMPULSORY PLACEMENT · ${compulsory} remaining`;
 
     blackBtn.querySelector("strong").textContent=colourName("black");
     whiteBtn.querySelector("strong").textContent=colourName("white");
@@ -894,8 +931,9 @@
     }
 
     reserveInfoEl.textContent = state.phase === "opening"
-      ? "Four shaped starter pieces: 2 of each colour. The opponent chooses the colour; the player chooses the corner."
-      : `${reserveTotal()} reserve pieces available · ${state.releasedCorners.filter(Boolean).length}/4 outer corners released · blocked inner corners cannot count in any winning pattern.`;
+      ? "Two same-colour special pieces at each outside corner. The chosen top piece flashes; dots mark where it can be placed."
+      : state.redeployPiece ? `Place the jumped ${colourName(state.redeployPiece.colour)} piece on a dotted square.`
+      : "The chosen reserve piece flashes until placed. Select a board piece to show its Move/Jump destinations; select it again to return to placement.";
 
     swapBox.hidden = !state.pendingSwap || isComputer(state.pendingSwap?.decider);
     jumpChoiceBox.hidden = !(state.consequence?.type === "jump-choice" && state.choosingColour && !isComputer(state.colourChooser));
@@ -1020,7 +1058,7 @@
   el("help-button").addEventListener("click",()=>el("help-dialog").showModal());el("close-help").addEventListener("click",()=>el("help-dialog").close());
   el("view-statistics-button").addEventListener("click",()=>{renderStatistics();el("statistics-dialog").showModal();});el("close-statistics").addEventListener("click",()=>el("statistics-dialog").close());el("reset-statistics").addEventListener("click",()=>{if(confirm("Reset all Lipfty statistics on this device?")){localStorage.removeItem(STATS_KEY);renderStatistics();}});
 
-  fetch("./build-info.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(info=>{const v=info?.version||"14.0.7";el("app-version").textContent=`Version ${v}`;el("mobile-version").textContent=`v${v}`;const ref=info?.commit||info?.gitCommit||"";el("build-reference").textContent=ref?` · ${String(ref).slice(0,7)}`:"";}).catch(()=>{el("app-version").textContent="Version 14.0.7";});
+  fetch("./build-info.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(info=>{const v=info?.version||"15.0.5";el("app-version").textContent=`Version ${v}`;el("mobile-version").textContent=`v${v}`;const ref=info?.commit||info?.gitCommit||"";el("build-reference").textContent=ref?` · ${String(ref).slice(0,7)}`:"";}).catch(()=>{el("app-version").textContent="Version 15.0.5";});
   let pendingUpdateRegistration = null;
   let updatePromptHandled = false;
   let reloadingForUpdate = false;
@@ -1058,4 +1096,5 @@
   registerServiceWorker();
   startGame();
 })();
+
 
