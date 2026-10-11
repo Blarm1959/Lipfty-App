@@ -138,7 +138,8 @@
       winner: null,
       winningCells: [],
       winType: null,
-      lastReleaseMessage: ""
+      lastReleaseMessage: "",
+      positionDecisionMessage: ""
     };
   }
 
@@ -369,6 +370,7 @@
     checkpoint();
     const { placer, decider } = state.pendingSwap;
     state.pendingSwap = null;
+    state.positionDecisionMessage = `${playerName(decider)} chose ${swap ? "Take position" : "Accept"}. The first placement stays on the board.`;
     state.currentPlayer = swap ? placer : decider;
     state.colourChooser = swap ? decider : placer;
     state.choosingColour = exactIndex === null;
@@ -380,6 +382,7 @@
   function placePiece(index) {
     if (state.winner !== null || state.choosingColour || state.board[index]) return;
     checkpoint();
+    state.positionDecisionMessage = "";
 
     if (state.redeployPiece) {
       state.board[index] = state.redeployPiece;
@@ -472,6 +475,7 @@
     const isJump = !!jump;
     if (!state.legalMoves.has(to) && !isJump) return;
     checkpoint();
+    state.positionDecisionMessage = "";
     const piece = state.board[from];
     state.board[from] = null;
     state.board[to] = piece;
@@ -801,6 +805,10 @@
   }
 
   function statusText() {
+    const explanation=state.winner===null && !state.pendingSwap ? state.positionDecisionMessage : "";
+    return (explanation ? explanation + " " : "") + turnStatusText();
+  }
+  function turnStatusText() {
     if (state.winner === "draw") return "Draw — every reserve piece has been used without a win.";
     if (state.winner !== null) {
       if (state.winType === "time") return `${playerName(state.winner)} wins on time.`;
