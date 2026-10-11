@@ -913,7 +913,7 @@
     statusEl.textContent = statusText() + (state.lastReleaseMessage ? ` ${state.lastReleaseMessage}.` : "");
     state.lastReleaseMessage = "";
 
-    const versionTitle = settings.version === "learning" ? "Learning" : settings.version === "extreme" ? "Extreme" : "Standard";
+    const versionTitle = settings.version === "learning" ? "Learning" : settings.version === "extreme" ? "Standard" : "Easy";
     el("quick-rules-title").textContent = `Lipfty · ${versionTitle}`;
     el("quick-win-rule").innerHTML = settings.version === "extreme"
       ? "<strong>Win:</strong> four in a line, or a tight/spaced Square."
