@@ -848,6 +848,7 @@
           btn.setAttribute("aria-label", `Two ${colourName(openingTop)} special pieces; top piece for Opening Four`);
           if (state.choosingColour && state.winner === null && !isComputer(state.colourChooser)) {
             btn.classList.add("selectable");
+            top.classList.add("piece--available-reserve");
             btn.addEventListener("click", () => chooseExactReserve(d));
           }
           boardEl.appendChild(btn);
@@ -859,7 +860,7 @@
           btn.appendChild(reservePiece);
           if (state.choosingColour && state.phase==="main" && !isComputer(state.colourChooser) && availableChoiceColours().includes(active)) {
             const held=state.consequence?.type==="move"?state.consequence.heldIndex:null;
-            if (d!==held) { btn.classList.add("selectable"); btn.addEventListener("click",()=>chooseExactReserve(d)); }
+            if (d!==held) { btn.classList.add("selectable"); reservePiece.classList.add("piece--available-reserve"); btn.addEventListener("click",()=>chooseExactReserve(d)); }
           }
         } else if (locked) {
           btn.appendChild(renderPiece(locked,true,true));

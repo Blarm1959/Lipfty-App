@@ -39,13 +39,9 @@ html.animations-off .winner{animation:none}
 .corner-stack .piece{position:absolute}
 .corner-stack .piece--stack-bottom{width:58%;transform:translate(-5%,6%);opacity:.35;filter:none}
 .corner-stack .piece--stack-top{width:64%;transform:translate(5%,-6%);z-index:2;opacity:1;filter:none}
-@keyframes lipfty-active-reserve-flash{
- from{filter:brightness(.82);box-shadow:0 0 0 2px rgba(36,91,150,.18),0 2px 5px rgba(0,0,0,.24)}
- to{filter:brightness(1.18);box-shadow:0 0 0 7px rgba(36,91,150,.42),0 0 18px rgba(36,91,150,.45),0 2px 5px rgba(0,0,0,.24)}
-}
 .piece--active-reserve{animation:lipfty-active-reserve-flash .7s ease-in-out infinite alternate}
-html.animations-off .piece--active-reserve{animation:none;outline:3px solid #245b96;outline-offset:3px}
-@media(prefers-reduced-motion:reduce){.piece--active-reserve{animation:none;outline:3px solid #245b96;outline-offset:3px}}
+html.animations-off .piece--active-reserve{animation:none;outline:3px solid var(--cue-colour);outline-offset:3px}
+@media(prefers-reduced-motion:reduce){.piece--active-reserve{animation:none;outline:3px solid var(--cue-colour);outline-offset:3px}}
 .placement-alert{margin:8px 0 0;padding:8px 10px;border-radius:10px;font-weight:900;line-height:1.25;background:rgba(255,216,110,.34);border:1px solid rgba(190,135,0,.35);color:var(--ink)}
 .placement-alert[hidden]{display:none}
 .dialog-heading h2{font-size:1.05rem}
@@ -157,3 +153,20 @@ dialog::backdrop{background:rgba(13,28,42,.45)}
 
 
 @media(min-width:561px) and (max-width:900px){.game-stage{grid-template-columns:1fr}}
+
+/* Available reserve choices pulse in their own colour; the chosen source is stronger. */
+.piece--black{--cue-colour:var(--piece-black)}
+.piece--white{--cue-colour:var(--piece-white)}
+.cell.selectable{box-shadow:none!important}
+@keyframes lipfty-available-reserve-pulse{
+ from{filter:brightness(.94);outline-color:transparent}
+ to{filter:brightness(1.12);outline-color:var(--cue-colour)}
+}
+.piece--available-reserve{outline:2px solid transparent;outline-offset:3px;animation:lipfty-available-reserve-pulse 1.1s ease-in-out infinite alternate}
+@keyframes lipfty-active-reserve-flash{
+ from{filter:brightness(.82);outline-color:transparent}
+ to{filter:brightness(1.18);outline-color:var(--cue-colour)}
+}
+.piece--active-reserve{outline:4px solid transparent;outline-offset:4px}
+html.animations-off .piece--available-reserve,html.animations-off .piece--active-reserve{animation:none;outline-color:var(--cue-colour)}
+@media(prefers-reduced-motion:reduce){.piece--available-reserve,.piece--active-reserve{animation:none;outline-color:var(--cue-colour)}}
