@@ -69,6 +69,9 @@
   }
 
   .board-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     height: 100%;
     min-height: 0;
     justify-content: flex-start;
@@ -77,6 +80,8 @@
   /* Height as well as width now limits the board. 190px leaves room for the
      title, turn strip, command bar, gaps and the board caption. */
   .board-frame {
+    flex: 0 0 auto;
+    height: auto;
     width: min(100%, 600px, calc(100dvh - 190px));
     max-width: 600px;
     padding: 5px;

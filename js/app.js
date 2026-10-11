@@ -36,6 +36,7 @@
   let clockActivePlayer = null;
   let clockLastTick = null;
   let resultRecorded = false;
+  let recordedResult = null;
 
   function defaultSettings() {
     return {
@@ -162,10 +163,20 @@
     history.push({ state: cloneState(state), clock: { remainingMs: [...clockRemainingMs], activePlayer: clockActivePlayer } });
     if (history.length > 60) history.shift();
   }
+  function undoActor(s) {
+    return s.pendingSwap ? s.pendingSwap.decider : s.choosingColour ? s.colourChooser : s.currentPlayer;
+  }
+  function canUndo() {
+    return settings.undo && history.some(snap => !isComputer(undoActor(snap.state)));
+  }
   function undo() {
-    if (!settings.undo || !history.length || isComputer(state.currentPlayer)) return;
+    if (!canUndo()) return;
     clearTimeout(timer);
-    const snap = history.pop();
+    rollbackResult();
+    let snap;
+    // Return to a human decision, so the computer cannot immediately replay it.
+    do { snap = history.pop(); } while (isComputer(undoActor(snap.state)));
+
     state = snap.state;
     restoreClock(snap.clock);
     render(); processFlow();
@@ -942,12 +953,12 @@
       el("choose-handed").textContent=`Place handed ${colourName(c.heldColour)}`;
       el("choose-jumped").textContent=`Place jumped ${colourName(c.jumpedPiece.colour)}`;
     }
-    undoBtn.disabled = !settings.undo || !history.length || state.winner!==null;
+    undoBtn.disabled = !canUndo();
     renderBoard();
   }
 
   function startGame() {
-    clearTimeout(timer); resultRecorded=false; nextPieceId=1; history=[]; state=freshState(); applyColours(); initialiseClock(); render(); processFlow();
+    clearTimeout(timer); resultRecorded=false; recordedResult=null; nextPieceId=1; history=[]; state=freshState(); applyColours(); initialiseClock(); render(); processFlow();
   }
 
   function playTone(kind="move") {
@@ -975,7 +986,7 @@
     return clockRemainingMs[clockActivePlayer] <= 0 ? clockActivePlayer : null;
   }
   function initialiseClock(){ if(clockInterval) clearInterval(clockInterval); const initial=clockEnabled()?Number(settings.clockMinutes)*60000:0; clockRemainingMs=[initial,initial]; clockActivePlayer=null; clockLastTick=null; renderClocks(); }
-  function restoreClock(snap){ if(clockInterval) clearInterval(clockInterval); const initial=clockEnabled()?Number(settings.clockMinutes)*60000:0; clockRemainingMs=snap?.remainingMs?[...snap.remainingMs]:[initial,initial]; clockActivePlayer=Number.isInteger(snap?.activePlayer)?snap.activePlayer:null; clockLastTick=clockActivePlayer===null?null:Date.now(); }
+  function restoreClock(snap){ if(clockInterval) clearInterval(clockInterval); clockInterval=null; const initial=clockEnabled()?Number(settings.clockMinutes)*60000:0; clockRemainingMs=snap?.remainingMs?[...snap.remainingMs]:[initial,initial]; clockActivePlayer=Number.isInteger(snap?.activePlayer)?snap.activePlayer:null; clockLastTick=clockActivePlayer===null?null:Date.now(); }
   function finishTimeLoss(expired){
     if(!state || state.winner!==null) return;
     clockRemainingMs[expired]=0; state.winner=other(expired); state.winType="time"; state.choosingColour=false;
@@ -1000,14 +1011,24 @@
   function loadStats(){try{const x=JSON.parse(localStorage.getItem(STATS_KEY)||"null"),b=emptyStats();return x?{computer:{...b.computer,...x.computer},two:{...b.two,...x.two}}:b;}catch(_){return emptyStats();}}
   function maybeRecordResult(){
     if(resultRecorded||state?.winner===null)return; resultRecorded=true; const stats=loadStats();
-    if(settings.mode==="computer"){const x=stats.computer;x.played++;if(state.winner==="draw")x.drawn++;else if(state.winner===0)x.won++;else x.lost++;}
-    else{const x=stats.two;x.played++;if(state.winner==="draw")x.drawn++;else if(state.winner===0)x.p1++;else x.p2++;}
-    try{localStorage.setItem(STATS_KEY,JSON.stringify(stats));}catch(_){}
+    const group=settings.mode==="computer"?"computer":"two";
+    const outcome=state.winner==="draw"?"drawn":group==="computer"?(state.winner===0?"won":"lost"):(state.winner===0?"p1":"p2");
+    stats[group].played++; stats[group][outcome]++;
+    try{localStorage.setItem(STATS_KEY,JSON.stringify(stats)); recordedResult={group,outcome};}catch(_){}
+  }
+  function rollbackResult(){
+    if(recordedResult){
+      const stats=loadStats(),{group,outcome}=recordedResult;
+      stats[group].played=Math.max(0,stats[group].played-1);
+      stats[group][outcome]=Math.max(0,stats[group][outcome]-1);
+      try{localStorage.setItem(STATS_KEY,JSON.stringify(stats));}catch(_){}
+    }
+    recordedResult=null; resultRecorded=false;
   }
   function renderStatistics(){const stats=loadStats(),box=el("statistics-content"),tile=(v,l)=>`<span><strong>${v}</strong><small>${l}</small></span>`;box.innerHTML=`<h3>Against the computer</h3><div class="statistics-summary">${tile(stats.computer.played,"Played")}${tile(stats.computer.won,"You won")}${tile(stats.computer.lost,"Computer won")}${tile(stats.computer.drawn,"Draws")}</div><h3>Two players</h3><div class="statistics-summary">${tile(stats.two.played,"Played")}${tile(stats.two.p1,"Player 1 won")}${tile(stats.two.p2,"Player 2 won")}${tile(stats.two.drawn,"Draws")}</div>`;}
 
   function jumpToEndTest(){
-    clearTimeout(timer); resultRecorded=false; nextPieceId=1; history=[]; state=freshState();
+    clearTimeout(timer); resultRecorded=false; recordedResult=null; nextPieceId=1; history=[]; state=freshState();
     state.phase="main"; state.openingPlaced=4; state.openingRemaining={black:0,white:0}; state.swapDone=true;
     state.board=Array(36).fill(null);
     [[0,"black"],[5,"white"],[30,"white"],[35,"black"]].forEach(([i,c])=>state.board[i]={id:nextPieceId++,colour:c,pinned:true,special:true,anchor:true});
