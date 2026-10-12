@@ -1060,7 +1060,7 @@
     const fallback=[[1,"black"],[2,"white"],[3,"white"],[4,"black"],[8,"black"],[11,"white"],[12,"black"],[14,"white"],[15,"black"],[16,"black"],[17,"white"],[19,"black"],[20,"black"],[21,"white"],[22,"white"],[23,"black"],[24,"white"],[25,"white"],[26,"white"],[27,"black"],[29,"white"],[31,"black"],[33,"black"],[34,"white"]];
     fallback.forEach(([i,c])=>state.board[i]={id:nextPieceId++,colour:c,pinned:false,special:false,anchor:false});
     state.reserve.active.fill(null); state.clearedEdges=[true,true,true,true]; [0,1,2,3].forEach(releaseCorner); state.releasedCorners=[true,true,true,true];
-    state.currentPlayer=0; state.colourChooser=0; state.choosingColour=true; state.assignedColour=null; state.selectedReserveIndex=null;
+    state.currentPlayer=0; state.colourChooser=1; state.choosingColour=true; state.assignedColour=null; state.selectedReserveIndex=null;
     initialiseClock(); render(); processFlow();
   }
 
