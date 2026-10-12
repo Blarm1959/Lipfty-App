@@ -198,7 +198,7 @@
   function placementOnlyNow() { return state.phase === "main" && !state.consequence && !state.redeployPiece && reserveColourCount() <= 1; }
 
   function blockedAnchors() {
-    return ANCHORS.filter((_, slot) => !state.releasedCorners[slot]);
+    return ANCHORS.filter((_, slot) => !state.releasedCorners[slot] || !!state.reserve.active[CORNERS[slot]]);
   }
   function ruleOptions() {
     return {
@@ -249,7 +249,7 @@
   function consumeReserve(index) {
     const colour = state.reserve.active[index];
     if (!colour) return null;
-    const piece = { id: nextPieceId++, colour, pinned: false, special: CORNERS.includes(index), anchor: false };
+    const piece = { id: nextPieceId++, colour, pinned: CORNERS.includes(index), special: CORNERS.includes(index), anchor: false };
     state.reserve.active[index] = null;
     updateEdgeReleases();
     return piece;
@@ -452,7 +452,7 @@
   }
 
   function canMoveOrJump() {
-    return settings.version !== "learning" && !state.consequence && !state.redeployPiece && !placementOnlyNow();
+    return settings.version !== "learning" && !state.consequence && !state.redeployPiece && !CORNERS.includes(state.selectedReserveIndex) && !placementOnlyNow();
   }
 
   function selectBoardPiece(index) {
@@ -469,6 +469,7 @@
   }
 
   function moveOrJump(to) {
+    if (!canMoveOrJump()) return;
     const from = state.selectedBoardIndex;
     if (from === null) return;
     const jump = state.legalJumps.get(to) || null;
@@ -544,14 +545,8 @@
 
   function blockedAnchorsAfterReserveRemoval(index) {
     if (index === null || index === undefined) return blockedAnchors();
-    const released = [...state.releasedCorners];
-    EDGE_DEFS.forEach((edge, edgeIndex) => {
-      if (state.clearedEdges[edgeIndex]) return;
-      if (edge.cells.every(i => i === index || !state.reserve.active[i])) {
-        edge.corners.forEach(slot => { released[slot] = true; });
-      }
-    });
-    return ANCHORS.filter((_, slot) => !released[slot]);
+    return ANCHORS.filter((_, slot) => !state.releasedCorners[slot] ||
+      (CORNERS[slot] !== index && !!state.reserve.active[CORNERS[slot]]));
   }
 
   function patternsFor(options) {
@@ -597,7 +592,7 @@
   function boardAfterAction(action, removeJumped = false) {
     const board = state.board.map(piece => piece ? { ...piece } : null);
     if (action.type === "place") {
-      board[action.to] = { colour: state.assignedColour };
+      board[action.to] = { colour: state.assignedColour, special: CORNERS.includes(state.selectedReserveIndex), pinned: CORNERS.includes(state.selectedReserveIndex) };
     } else {
       const piece = board[action.from];
       board[action.from] = null;
@@ -714,8 +709,8 @@
     }
 
     // Expert also chooses the exact physical reserve piece. That matters in
-    // Lipfty 14 because lifting the final piece from an edge can release both
-    // corners before the selected piece is placed.
+    // Lipfty 15 because placing an outside special piece unblocks its
+    // matching inner anchor; clearing an edge only makes corners available.
     const candidates = [];
     for (const colour of colours) {
       for (const index of activeReserveIndices(colour, exclude)) candidates.push({ colour, index });
