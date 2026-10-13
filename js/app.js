@@ -752,9 +752,11 @@
 
     const wins = actions.filter(actionWouldWin);
     const candidates = wins.length ? wins : actions;
+    // Difficulty 2 also evaluates the next player's winning replies.
+    // Shared colours make greedy line-building an unsafe default.
     const action = wins.length
       ? candidates[Math.floor(Math.random()*candidates.length)]
-      : chooseBestByScore(candidates, candidate => positionalActionScore(candidate, settings.level === "expert"), true);
+      : chooseBestByScore(candidates, candidate => positionalActionScore(candidate, true), true);
     if (action.type === "place") placePiece(action.to);
     else { selectBoardPiece(action.from); moveOrJump(action.to); }
   }
@@ -1090,7 +1092,7 @@
   el("help-button").addEventListener("click",()=>el("help-dialog").showModal());el("close-help").addEventListener("click",()=>el("help-dialog").close());
   el("view-statistics-button").addEventListener("click",()=>{renderStatistics();el("statistics-dialog").showModal();});el("close-statistics").addEventListener("click",()=>el("statistics-dialog").close());el("reset-statistics").addEventListener("click",()=>{if(confirm("Reset all Lipfty statistics on this device?")){localStorage.removeItem(STATS_KEY);renderStatistics();}});
 
-  fetch("./build-info.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(info=>{const v=info?.version||"16.0.1";el("app-version").textContent=`Version ${v}`;el("mobile-version").textContent=`v${v}`;const ref=info?.commit||info?.gitCommit||"";el("build-reference").textContent=ref?` · ${String(ref).slice(0,7)}`:"";}).catch(()=>{el("app-version").textContent="Version 16.0.1";});
+  fetch("./build-info.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(info=>{const v=info?.version||"16.0.2";el("app-version").textContent=`Version ${v}`;el("mobile-version").textContent=`v${v}`;const ref=info?.commit||info?.gitCommit||"";el("build-reference").textContent=ref?` · ${String(ref).slice(0,7)}`:"";}).catch(()=>{el("app-version").textContent="Version 16.0.2";});
   let pendingUpdateRegistration = null;
   let updatePromptHandled = false;
   let reloadingForUpdate = false;
@@ -1128,6 +1130,7 @@
   registerServiceWorker();
   startGame();
 })();
+
 
 
 
