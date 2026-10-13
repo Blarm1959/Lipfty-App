@@ -48,14 +48,14 @@
         </aside>
 
         <aside class="stage-info-card" id="stage-info-card">
-          <p class="panel-help" id="phase-help">Opening Four setup.</p>
+          <p class="panel-help" id="phase-help">Empty inner 6×6 start.</p>
           <p class="placement-alert" id="placement-alert" hidden></p>
         </aside>
 
         <section class="board-section">
           <div class="board-frame">
             <div id="board" class="board" role="grid" aria-label="Lipfty eight by eight board with inner six by six playing area"></div>
-            <p class="board-note">Lipfty: inner 6×6 playing area, 24 ordinary reserve pieces and eight shaped Opening/Final pieces.</p>
+            <p class="board-note">Lipfty: inner 6×6 playing area, 24 ordinary reserve pieces and four shaped special pieces.</p>
           </div>
           <div id="swap-box" class="decision-box" hidden>
             <strong>Accept the first placement or take the position?</strong>
@@ -70,10 +70,10 @@
 
         <aside class="rules-panel rules-panel--quick">
           <h2 id="quick-rules-title">Lipfty · Easy</h2>
-          <p id="quick-opening-rule"><strong>Opening:</strong> two same-colour special pieces start stacked at each outside corner. The opponent chooses a top piece; the player places it on an empty inner 6×6 corner. Bottom pieces stay outside until released and placed.</p>
+          <p id="quick-opening-rule"><strong>Start:</strong> empty inner 6×6; one special at each outside corner.</p>
           <p><strong>Your turn:</strong> use the reserve colour handed to you to <strong>Place</strong>, <strong>Move</strong> one adjacent square, or make one opposite-colour <strong>Jump</strong>.</p>
           <p id="quick-win-rule"><strong>Win:</strong> make four in a horizontal, vertical or diagonal line.</p>
-          <p><strong>Corner release:</strong> clear all six ordinary pieces from an outside edge to release both end corners and activate their matching Opening Four pieces.</p>
+          <p><strong>Specials:</strong> ordinary reserves first. Specials are Place only and permanently fixed. At the end choose your own special.</p>
           <p class="panel-help"><strong>?</strong> opens the complete Lipfty rules.</p>
         </aside>
       </section>
@@ -81,7 +81,7 @@
       <section class="action-bar">
         <div class="action-bar-left"><button class="button button--primary" id="new-game" type="button">New game</button></div>
         <div class="action-bar-centre"><button class="button button--secondary" id="undo" type="button">Undo</button></div>
-        <div class="build-info"><span id="app-version">Version 15.0.5</span><span id="build-reference"></span></div>
+        <div class="build-info"><span id="app-version">Version 16.0.1</span><span id="build-reference"></span></div>
       </section>
     </main>
   </div>
@@ -149,20 +149,21 @@
   <dialog id="statistics-dialog"><div class="dialog-heading"><div><p class="dialog-eyebrow">Lipfty</p><h2>Statistics</h2></div><button class="dialog-close" id="close-statistics" type="button">×</button></div><div id="statistics-content" class="statistics-content"></div><div class="dialog-actions"><button class="button button--secondary" id="reset-statistics" type="button">Reset statistics</button></div></dialog>
 
   <dialog id="help-dialog"><div class="dialog-heading"><div><p class="dialog-eyebrow">How to play</p><h2>Lipfty</h2></div><button class="dialog-close" id="close-help" type="button" aria-label="Close">×</button></div><div class="rules-copy"><p><a href="Lipfty-Rules.pdf" target="_blank" rel="noopener">Printable rules (PDF)</a> · <a href="Lipfty-Rules.md" target="_blank" rel="noopener">Rules source (Markdown)</a></p>
-    <p><strong>Objective.</strong> Make a winning pattern on the inner 6×6. Pieces are shared rather than owned by either player.</p>
-    <p><strong>Opening Four.</strong> Start with two same-colour special pieces stacked at each physical board corner: two Red stacks and two Blue stacks (or your chosen colours). The opponent chooses a top piece; the player places it on any empty corner of the inner 6×6. The bottom piece stays locked at its outside corner. When only one colour remains, all remaining Opening Four placements are automatic.</p>
-    <p><strong>First normal placement.</strong> After the Opening Four, the starter places the first ordinary reserve piece. The other player then chooses <strong>Accept</strong> or <strong>Take position</strong>. Clicking the first placed piece takes the position. Clicking an available outside piece accepts and selects that exact piece for the deciding player’s next turn. The Accept button lets the starter choose the next piece as usual.</p>
-    <p><strong>Corner rule.</strong> An Opening Four piece is blocked from every winning pattern while its matching outside special piece remains outside, even after release. All shaped pieces are Place only, pinned once placed, and cannot Move, Jump or be jumped over.</p>
-    <p><strong>Release rule.</strong> When all six ordinary reserve pieces on an outside edge have gone, both special corner pieces at the ends of that edge are released. Released pieces are optional choices alongside ordinary reserves. An inner corner becomes active for wins only when its matching outside piece is placed.</p>
-    <p><strong>Learning.</strong> Place only. Win with four of one colour horizontally, vertically or diagonally.</p>
-    <p><strong>Easy.</strong> Place, Move or Jump. Move one square in any direction. Jump over one adjacent opposite-colour movable piece into the empty square beyond.</p>
-    <p><strong>Standard.</strong> Easy plus tight and spaced axis-aligned Square wins.</p>
-    <p><strong>Move consequence.</strong> The mover keeps the originally handed piece. The opponent chooses and places another reserve piece; the mover then places the original piece.</p>
-    <p><strong>Jump consequence.</strong> The jumped piece and originally handed piece are both redeployed in the established Lipfty sequence.</p>
+    <p><strong>Objective.</strong> Complete four of one colour in a line; Standard also allows tight and spaced axis-aligned squares. Colours are shared.</p>
+    <p><strong>Setup.</strong> The inner 6×6 starts empty. Put 24 ordinary pieces on the outside edges and one shaped special at each physical corner: two of each colour. No Opening Four.</p>
+    <p><strong>First placement.</strong> Keep the Accept / Take position choice. Click the first board piece to Take position or an available ordinary outside piece to Accept and select it.</p>
+    <p><strong>Normal play.</strong> The opponent selects an ordinary reserve piece. Place it, Move an unpinned board piece of that colour one adjacent square, or Jump over one adjacent opposite-colour unpinned piece. Learning is Place only.</p>
+    <p><strong>Move consequence.</strong> The opponent chooses and places another ordinary reserve piece; the mover places the exact held piece. If that held piece is the last ordinary reserve, the opponent chooses a corner special for their placement.</p>
+    <p><strong>Jump consequence.</strong> The opponent chooses and places either the exact held piece or exact jumped piece; the jumper places the other. No corner replacement.</p>
+    <p><strong>Specials.</strong> Ordinary choices take priority while any remain. A special never permits Move/Jump. Once placed it counts towards wins but cannot Move, Jump or be jumped over. At the end, the current player chooses and places their own remaining special.</p>
+    <p><strong>Endgame.</strong> Move/Jump continues even with one ordinary reserve colour left. Finish compulsory placements. Draw when all reserves are used without a win, or a compulsory placement cannot be completed.</p>
+    <p><strong>Wins and protection.</strong> Check after every placement, Move, Jump and redeployment; a win stops the sequence. The moving piece is protected during its consequence and the opponent’s following normal turn.</p>
+    <p><strong>Clock and Undo.</strong> Time expiry loses. Undo restores position, clock and statistics and returns to a human decision against the computer.</p>
   </div></dialog>
 
   <script src="js/rules.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
+
 

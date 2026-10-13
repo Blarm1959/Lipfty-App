@@ -93,7 +93,7 @@
     const active = Array(64).fill(null), locked = Array(64).fill(null);
     const normal = EDGE_DEFS.flatMap(e => e.cells);
     shuffled([...Array(12).fill("black"), ...Array(12).fill("white")]).forEach((c,i) => active[normal[i]] = c);
-    shuffled(["black","black","white","white"]).forEach((c,i) => locked[CORNERS[i]] = c);
+    shuffled(["black","black","white","white"]).forEach((c,i) => active[CORNERS[i]] = c);
     return { active, locked };
   }
 
@@ -113,14 +113,14 @@
     const starter = chooseStarter();
     const reserve = freshReserve();
     return {
-      phase: "opening",
+      phase: "main",
       board: Array(36).fill(null),
       reserve,
       openingReserve: reserve.locked.map(colour => colour),
       selectedOpeningIndex: null,
       releasedCorners: [false,false,false,false],
       clearedEdges: [false,false,false,false],
-      openingRemaining: { black: 2, white: 2 },
+      openingRemaining: { black: 0, white: 0 },
       openingPlaced: 0,
       currentPlayer: starter,
       colourChooser: other(starter),
@@ -183,23 +183,22 @@
     render(); processFlow();
   }
 
-  function activeReserveIndices(colour = null, exclude = null) {
-    const out = [];
-    for (let i = 0; i < 64; i += 1) {
-      if (i === exclude) continue;
-      const c = state.reserve.active[i];
-      if (c && (!colour || c === colour)) out.push(i);
-    }
-    return out;
+  function ordinaryReserveIndices(exclude = null) {
+    return state.reserve.active.map((colour,i) => colour && i !== exclude && !CORNERS.includes(i) ? i : null).filter(i => i !== null);
   }
+  function activeReserveIndices(colour = null, exclude = null) {
+    const ordinary = ordinaryReserveIndices(exclude);
+    const usable = ordinary.length ? ordinary : CORNERS.filter(i => i !== exclude && state.reserve.active[i]);
+    return usable.filter(i => !colour || state.reserve.active[i] === colour);
+  }
+
   function reserveCount(colour) { return activeReserveIndices(colour).length; }
   function reserveTotal() { return activeReserveIndices().length; }
   function reserveColourCount() { return ["black","white"].filter(c => reserveCount(c) > 0).length; }
-  function placementOnlyNow() { return state.phase === "main" && !state.consequence && !state.redeployPiece && reserveColourCount() <= 1; }
+  function placementOnlyNow() { return false; }
 
-  function blockedAnchors() {
-    return ANCHORS.filter((_, slot) => !state.releasedCorners[slot] || !!state.reserve.active[CORNERS[slot]]);
-  }
+  function blockedAnchors() { return []; }
+
   function ruleOptions() {
     return {
       allowDiagonal: true,
@@ -235,15 +234,7 @@
     return true;
   }
   function updateEdgeReleases() {
-    const released = [];
-    EDGE_DEFS.forEach((edge, edgeIndex) => {
-      if (state.clearedEdges[edgeIndex]) return;
-      if (!edge.cells.every(i => !state.reserve.active[i])) return;
-      state.clearedEdges[edgeIndex] = true;
-      const newly = edge.corners.filter(releaseCorner);
-      if (newly.length) released.push(`${edge.name} edge released ${newly.length === 2 ? "both corners" : "a corner"}`);
-    });
-    state.lastReleaseMessage = released.join("; ");
+    state.releasedCorners = CORNERS.map(i => !!state.reserve.active[i] && ordinaryReserveIndices().length === 0);
   }
 
   function consumeReserve(index) {
@@ -298,7 +289,7 @@
   function nextNormalTurn(current, chooser, protectedId = null) {
     state.phase = "main";
     state.currentPlayer = current;
-    state.colourChooser = chooser;
+    state.colourChooser = ordinaryReserveIndices().length ? chooser : current;
     state.protectedPieceId = protectedId;
     state.choosingColour = true;
     state.assignedColour = null;
@@ -366,7 +357,7 @@
 
   function resolveSwap(swap, exactIndex = null) {
     if (!state.pendingSwap) return;
-    if (exactIndex !== null && (swap || isComputer(state.pendingSwap.decider) || !state.reserve.active[exactIndex])) return;
+    if (exactIndex !== null && (swap || isComputer(state.pendingSwap.decider) || !activeReserveIndices().includes(exactIndex))) return;
     checkpoint();
     const { placer, decider } = state.pendingSwap;
     state.pendingSwap = null;
@@ -461,7 +452,7 @@
     if (!p || p.colour !== state.assignedColour || p.pinned || p.id === state.protectedPieceId) return;
     if (state.selectedBoardIndex === index) { clearSelection(); render(); return; }
     state.selectedBoardIndex = index;
-    state.legalMoves = new Set(R.adjacentDestinations(state.board,index));
+    state.legalMoves = new Set(activeReserveIndices(null,state.selectedReserveIndex).length ? R.adjacentDestinations(state.board,index) : []);
     state.legalJumps = new Map(R.jumpDestinations(state.board,index)
       .filter(j => state.board[j.over] && !state.board[j.over].pinned && state.board[j.over].colour !== p.colour)
       .map(j => [j.to,j]));
@@ -543,11 +534,7 @@
     return { ...ruleOptions(), inactiveWinCells };
   }
 
-  function blockedAnchorsAfterReserveRemoval(index) {
-    if (index === null || index === undefined) return blockedAnchors();
-    return ANCHORS.filter((_, slot) => !state.releasedCorners[slot] ||
-      (CORNERS[slot] !== index && !!state.reserve.active[CORNERS[slot]]));
-  }
+  function blockedAnchorsAfterReserveRemoval() { return []; }
 
   function patternsFor(options) {
     const blocked = new Set(options.inactiveWinCells || []);
@@ -623,7 +610,7 @@
     for (let from = 0; from < 36; from += 1) {
       const piece = state.board[from];
       if (!piece || piece.colour !== state.assignedColour || piece.pinned || piece.id === state.protectedPieceId) continue;
-      R.adjacentDestinations(state.board, from).forEach(to => actions.push({ type:"move", from, to }));
+      if (activeReserveIndices(null,state.selectedReserveIndex).length) R.adjacentDestinations(state.board, from).forEach(to => actions.push({ type:"move", from, to }));
       R.jumpDestinations(state.board, from)
         .filter(j => state.board[j.over] && !state.board[j.over].pinned && state.board[j.over].colour !== piece.colour)
         .forEach(j => actions.push({ type:"jump", from, to:j.to, over:j.over }));
@@ -804,7 +791,7 @@
     return (explanation ? explanation + " " : "") + turnStatusText();
   }
   function turnStatusText() {
-    if (state.winner === "draw") return "Draw — every reserve piece has been used without a win.";
+    if (state.winner === "draw") return "Draw — no playable reserve piece remains without a win.";
     if (state.winner !== null) {
       if (state.winType === "time") return `${playerName(state.winner)} wins on time.`;
       return `${playerName(state.winner)} wins${state.winType === "square" ? " with a square" : " with four in a row"}.`;
@@ -815,7 +802,9 @@
       return `${playerName(state.currentPlayer)}: place the ${colourName(state.assignedColour)} Opening Four piece on any empty 6×6 corner.`;
     }
     if (state.consequence?.type === "jump-choice" && state.choosingColour) return `${playerName(state.currentPlayer)}: choose which piece you will place after the Jump.`;
-    if (state.choosingColour) return `${playerName(state.colourChooser)}: choose a reserve piece/colour for ${playerName(state.currentPlayer)}.`;
+    if (state.choosingColour) return ordinaryReserveIndices(state.consequence?.heldIndex).length
+      ? `${playerName(state.colourChooser)}: choose a reserve piece/colour for ${playerName(state.currentPlayer)}.`
+      : `${playerName(state.currentPlayer)}: choose a remaining special to place.`;
     if (state.redeployPiece) return `${playerName(state.currentPlayer)}: place the jumped ${colourName(state.redeployPiece.colour)} piece on any empty square.`;
     if (state.consequence?.type === "move" && state.consequence.step === 2) return `${playerName(state.currentPlayer)}: now place the originally handed ${colourName(state.assignedColour)} piece on any empty square.`;
     if (!canMoveOrJump()) return `${playerName(state.currentPlayer)}: place the ${colourName(state.assignedColour)} piece on any empty square.`;
@@ -859,17 +848,20 @@
           continue;
         }
         if (active) {
-          const reservePiece = renderPiece(active, slot>=0);
+          const held = state.consequence?.type === "move" ? state.consequence.heldIndex : null;
+          const available = activeReserveIndices(null, held).includes(d);
+          const reservePiece = renderPiece(active, slot>=0, slot>=0 && !available);
           if (state.winner === null && !state.pendingSwap && !state.choosingColour && !state.redeployPiece && state.selectedReserveIndex === d) reservePiece.classList.add("piece--active-reserve");
           btn.appendChild(reservePiece);
-          if (state.winner===null && state.pendingSwap && !isComputer(state.pendingSwap.decider)) {
+          if (slot>=0) btn.title=available ? "Special: Place only; permanently fixed once placed" : "Special unavailable while ordinary reserve choices remain";
+          if (state.winner===null && state.pendingSwap && available && !isComputer(state.pendingSwap.decider)) {
             btn.classList.add("selectable"); reservePiece.classList.add("piece--available-reserve");
             btn.setAttribute("aria-label", `Accept and select this ${colourName(active)} reserve piece`);
             btn.addEventListener("click",()=>resolveSwap(false,d));
           }
-          if (state.choosingColour && state.phase==="main" && !isComputer(state.colourChooser) && availableChoiceColours().includes(active)) {
+          if (state.winner===null && state.choosingColour && state.phase==="main" && !isComputer(state.colourChooser) && availableChoiceColours().includes(active)) {
             const held=state.consequence?.type==="move"?state.consequence.heldIndex:null;
-            if (d!==held) { btn.classList.add("selectable"); reservePiece.classList.add("piece--available-reserve"); btn.addEventListener("click",()=>chooseExactReserve(d)); }
+            if (d!==held && available) { btn.classList.add("selectable"); reservePiece.classList.add("piece--available-reserve"); btn.addEventListener("click",()=>chooseExactReserve(d)); }
           }
         } else if (locked) {
           btn.appendChild(renderPiece(locked,true,true));
@@ -913,9 +905,7 @@
     el("quick-win-rule").innerHTML = settings.version === "extreme"
       ? "<strong>Win:</strong> four in a line, or a tight/spaced Square."
       : "<strong>Win:</strong> make four in a horizontal, vertical or diagonal line.";
-    el("phase-help").textContent = state.phase === "opening"
-      ? `Opening Four · ${state.openingPlaced}/4 placed. Choose a top piece from an outside corner stack for the opponent to place on an empty inner 6×6 corner. The bottom piece stays locked.`
-      : `${reserveTotal()} reserve pieces remain · ${state.releasedCorners.filter(Boolean).length}/4 outer corners released.`;
+    el("phase-help").textContent = `${ordinaryReserveIndices().length} ordinary pieces remain · ${CORNERS.filter(i => state.reserve.active[i]).length} specials remain.`;
     const consequence = state.consequence;
     const compulsory = consequence
       ? (consequence.type === "move" ? (consequence.step === 1 ? 2 : 1)
@@ -926,8 +916,9 @@
 
     blackBtn.querySelector("strong").textContent=colourName("black");
     whiteBtn.querySelector("strong").textContent=colourName("white");
-    const blackCount = state.phase==="opening" ? state.openingRemaining.black : reserveCount("black");
-    const whiteCount = state.phase==="opening" ? state.openingRemaining.white : reserveCount("white");
+    const excludeHeld = state.consequence?.type === "move" ? state.consequence.heldIndex : null;
+    const blackCount = activeReserveIndices("black",excludeHeld).length;
+    const whiteCount = activeReserveIndices("white",excludeHeld).length;
     blackBtn.querySelector("small").textContent=`${blackCount} available`;
     whiteBtn.querySelector("small").textContent=`${whiteCount} available`;
     blackBtn.disabled = !state.choosingColour || isComputer(state.colourChooser) || !availableChoiceColours().includes("black") || !!state.pendingSwap;
@@ -1051,11 +1042,11 @@
     clearTimeout(timer); resultRecorded=false; recordedResult=null; nextPieceId=1; history=[]; state=freshState();
     state.phase="main"; state.openingPlaced=4; state.openingRemaining={black:0,white:0}; state.swapDone=true;
     state.board=Array(36).fill(null);
-    [[0,"black"],[5,"white"],[30,"white"],[35,"black"]].forEach(([i,c])=>state.board[i]={id:nextPieceId++,colour:c,pinned:true,special:true,anchor:true});
     const fallback=[[1,"black"],[2,"white"],[3,"white"],[4,"black"],[8,"black"],[11,"white"],[12,"black"],[14,"white"],[15,"black"],[16,"black"],[17,"white"],[19,"black"],[20,"black"],[21,"white"],[22,"white"],[23,"black"],[24,"white"],[25,"white"],[26,"white"],[27,"black"],[29,"white"],[31,"black"],[33,"black"],[34,"white"]];
     fallback.forEach(([i,c])=>state.board[i]={id:nextPieceId++,colour:c,pinned:false,special:false,anchor:false});
-    state.reserve.active.fill(null); state.clearedEdges=[true,true,true,true]; [0,1,2,3].forEach(releaseCorner); state.releasedCorners=[true,true,true,true];
-    state.currentPlayer=0; state.colourChooser=1; state.choosingColour=true; state.assignedColour=null; state.selectedReserveIndex=null;
+    const specials = CORNERS.map(i => state.reserve.active[i]);
+    state.reserve.active.fill(null); CORNERS.forEach((i,n) => state.reserve.active[i]=specials[n]); state.releasedCorners=[true,true,true,true];
+    state.currentPlayer=0; state.colourChooser=0; state.choosingColour=true; state.assignedColour=null; state.selectedReserveIndex=null;
     initialiseClock(); render(); processFlow();
   }
 
@@ -1099,12 +1090,12 @@
   el("help-button").addEventListener("click",()=>el("help-dialog").showModal());el("close-help").addEventListener("click",()=>el("help-dialog").close());
   el("view-statistics-button").addEventListener("click",()=>{renderStatistics();el("statistics-dialog").showModal();});el("close-statistics").addEventListener("click",()=>el("statistics-dialog").close());el("reset-statistics").addEventListener("click",()=>{if(confirm("Reset all Lipfty statistics on this device?")){localStorage.removeItem(STATS_KEY);renderStatistics();}});
 
-  fetch("./build-info.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(info=>{const v=info?.version||"15.0.5";el("app-version").textContent=`Version ${v}`;el("mobile-version").textContent=`v${v}`;const ref=info?.commit||info?.gitCommit||"";el("build-reference").textContent=ref?` · ${String(ref).slice(0,7)}`:"";}).catch(()=>{el("app-version").textContent="Version 15.0.5";});
+  fetch("./build-info.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(info=>{const v=info?.version||"16.0.1";el("app-version").textContent=`Version ${v}`;el("mobile-version").textContent=`v${v}`;const ref=info?.commit||info?.gitCommit||"";el("build-reference").textContent=ref?` · ${String(ref).slice(0,7)}`:"";}).catch(()=>{el("app-version").textContent="Version 16.0.1";});
   let pendingUpdateRegistration = null;
   let updatePromptHandled = false;
   let reloadingForUpdate = false;
   function gameIsInProgress(){
-    return !!state && state.winner === null && (state.openingPlaced > 0 || state.board.some(Boolean) || reserveTotal() < 24);
+    return !!state && state.winner === null && (state.openingPlaced > 0 || state.board.some(Boolean) || ordinaryReserveIndices().length < 24);
   }
   function maybeOfferUpdate(){
     const registration = pendingUpdateRegistration;
@@ -1137,5 +1128,6 @@
   registerServiceWorker();
   startGame();
 })();
+
 
 
