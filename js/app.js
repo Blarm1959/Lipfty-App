@@ -774,9 +774,28 @@
     return strength >= 8;
   }
 
+  function autoChooseOnlyColour() {
+    if (!state || state.winner !== null || state.pendingSwap || !state.choosingColour ||
+        state.phase !== "main" || state.consequence?.type === "jump-choice") return false;
+    const colours = availableChoiceColours();
+    if (colours.length !== 1) return false;
+    const exclude = state.consequence?.type === "move" ? state.consequence.heldIndex : null;
+    const sources = activeReserveIndices(colours[0], exclude);
+    if (!sources.length) return false;
+    state.selectedReserveIndex = sources[Math.floor(Math.random() * sources.length)];
+    state.assignedColour = colours[0];
+    state.choosingColour = false;
+    clearSelection();
+    return true;
+  }
+
   function processFlow() {
     clearTimeout(timer);
+    // Resolve forced colour handovers before assigning the decision clock.
+    // No checkpoint: Undo should return to a meaningful player decision.
+    const automatic = autoChooseOnlyColour();
     syncClock();
+    if (automatic) render();
     if (state.winner !== null) return;
     const shortDelay = settings.animations ? 180 : 0;
     const playDelay = settings.animations ? 420 : 0;
@@ -1092,7 +1111,7 @@
   el("help-button").addEventListener("click",()=>el("help-dialog").showModal());el("close-help").addEventListener("click",()=>el("help-dialog").close());
   el("view-statistics-button").addEventListener("click",()=>{renderStatistics();el("statistics-dialog").showModal();});el("close-statistics").addEventListener("click",()=>el("statistics-dialog").close());el("reset-statistics").addEventListener("click",()=>{if(confirm("Reset all Lipfty statistics on this device?")){localStorage.removeItem(STATS_KEY);renderStatistics();}});
 
-  fetch("./build-info.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(info=>{const v=info?.version||"16.0.2";el("app-version").textContent=`Version ${v}`;el("mobile-version").textContent=`v${v}`;const ref=info?.commit||info?.gitCommit||"";el("build-reference").textContent=ref?` · ${String(ref).slice(0,7)}`:"";}).catch(()=>{el("app-version").textContent="Version 16.0.2";});
+  fetch("./build-info.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(info=>{const v=info?.version||"16.0.3";el("app-version").textContent=`Version ${v}`;el("mobile-version").textContent=`v${v}`;const ref=info?.commit||info?.gitCommit||"";el("build-reference").textContent=ref?` · ${String(ref).slice(0,7)}`:"";}).catch(()=>{el("app-version").textContent="Version 16.0.3";});
   let pendingUpdateRegistration = null;
   let updatePromptHandled = false;
   let reloadingForUpdate = false;
@@ -1130,6 +1149,7 @@
   registerServiceWorker();
   startGame();
 })();
+
 
 
 

@@ -81,7 +81,7 @@
       <section class="action-bar">
         <div class="action-bar-left"><button class="button button--primary" id="new-game" type="button">New game</button></div>
         <div class="action-bar-centre"><button class="button button--secondary" id="undo" type="button">Undo</button></div>
-        <div class="build-info"><span id="app-version">Version 16.0.2</span><span id="build-reference"></span></div>
+        <div class="build-info"><span id="app-version">Version 16.0.3</span><span id="build-reference"></span></div>
       </section>
     </main>
   </div>
@@ -152,7 +152,7 @@
     <p><strong>Objective.</strong> Complete four of one colour in a line; Standard also allows tight and spaced axis-aligned squares. Colours are shared.</p>
     <p><strong>Setup.</strong> The inner 6×6 starts empty. Put 24 ordinary pieces on the outside edges and one shaped special at each physical corner: two of each colour. No Opening Four.</p>
     <p><strong>First placement.</strong> Keep the Accept / Take position choice. Click the first board piece to Take position or an available ordinary outside piece to Accept and select it.</p>
-    <p><strong>Normal play.</strong> The opponent selects an ordinary reserve piece. Place it, Move an unpinned board piece of that colour one adjacent square, or Jump over one adjacent opposite-colour unpinned piece. Learning is Place only.</p>
+    <p><strong>Normal play.</strong> The opponent selects an ordinary reserve piece. Place it, Move an unpinned board piece of that colour one adjacent square, or Jump over one adjacent opposite-colour unpinned piece. Learning is Place only. When only one reserve colour is available, it is selected automatically; the player taking the turn still chooses their action.</p>
     <p><strong>Move consequence.</strong> The opponent chooses and places another ordinary reserve piece; the mover places the exact held piece. If that held piece is the last ordinary reserve, the opponent chooses a corner special for their placement.</p>
     <p><strong>Jump consequence.</strong> The opponent chooses and places either the exact held piece or exact jumped piece; the jumper places the other. No corner replacement.</p>
     <p><strong>Specials.</strong> Ordinary choices take priority while any remain. A special never permits Move/Jump. Once placed it counts towards wins but cannot Move, Jump or be jumped over. At the end, the current player chooses and places their own remaining special.</p>
@@ -165,6 +165,7 @@
   <script src="js/app.js"></script>
 </body>
 </html>
+
 
 
 
