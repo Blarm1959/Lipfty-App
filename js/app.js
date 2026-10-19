@@ -37,13 +37,14 @@
   let clockLastTick = null;
   let resultRecorded = false;
   let recordedResult = null;
+  let match = null;
 
   function defaultSettings() {
     return {
       mode: "computer", level: "standard", version: "standard", starter: "random",
       player1: "Player", player2: "Player 2", colour1: "red", colour2: "blue",
       clockMinutes: 0, clockIncrement: 0, sound: true, animations: true, language: "en-GB",
-      undo: true, colourDefaultsVersion: 1403
+      undo: true, matchLength: 5, colourDefaultsVersion: 1403
     };
   }
   function loadSettings() {
@@ -56,6 +57,7 @@
         }
         saved.colourDefaultsVersion = 1403;
       }
+      if (![1,3,5].includes(saved.matchLength)) saved.matchLength = 5;
       return { ...defaultSettings(), ...saved };
     } catch (_) { return defaultSettings(); }
   }
@@ -93,7 +95,6 @@
     const active = Array(64).fill(null), locked = Array(64).fill(null);
     const normal = EDGE_DEFS.flatMap(e => e.cells);
     shuffled([...Array(12).fill("black"), ...Array(12).fill("white")]).forEach((c,i) => active[normal[i]] = c);
-    shuffled(["black","black","white","white"]).forEach((c,i) => active[CORNERS[i]] = c);
     return { active, locked };
   }
 
@@ -109,8 +110,7 @@
     return Math.random() < 0.5 ? 0 : 1;
   }
 
-  function freshState() {
-    const starter = chooseStarter();
+  function freshState(starter = chooseStarter()) {
     const reserve = freshReserve();
     return {
       phase: "main",
@@ -161,7 +161,7 @@
   function checkpoint() {
     if (!settings.undo || state.winner !== null) return;
     settleClock();
-    history.push({ state: cloneState(state), clock: { remainingMs: [...clockRemainingMs], activePlayer: clockActivePlayer } });
+    history.push({ state: cloneState(state), match: cloneMatch(), clock: { remainingMs: [...clockRemainingMs], activePlayer: clockActivePlayer } });
     if (history.length > 60) history.shift();
   }
   function undoActor(s) {
@@ -179,6 +179,7 @@
     do { snap = history.pop(); } while (isComputer(undoActor(snap.state)));
 
     state = snap.state;
+    match = snap.match;
     restoreClock(snap.clock);
     render(); processFlow();
   }
@@ -187,9 +188,7 @@
     return state.reserve.active.map((colour,i) => colour && i !== exclude && !CORNERS.includes(i) ? i : null).filter(i => i !== null);
   }
   function activeReserveIndices(colour = null, exclude = null) {
-    const ordinary = ordinaryReserveIndices(exclude);
-    const usable = ordinary.length ? ordinary : CORNERS.filter(i => i !== exclude && state.reserve.active[i]);
-    return usable.filter(i => !colour || state.reserve.active[i] === colour);
+    return ordinaryReserveIndices(exclude).filter(i => !colour || state.reserve.active[i] === colour);
   }
 
   function reserveCount(colour) { return activeReserveIndices(colour).length; }
@@ -239,7 +238,7 @@
 
   function consumeReserve(index) {
     const colour = state.reserve.active[index];
-    if (!colour) return null;
+    if (!colour || CORNERS.includes(index)) return null;
     const piece = { id: nextPieceId++, colour, pinned: CORNERS.includes(index), special: CORNERS.includes(index), anchor: false };
     state.reserve.active[index] = null;
     updateEdgeReleases();
@@ -289,7 +288,7 @@
   function nextNormalTurn(current, chooser, protectedId = null) {
     state.phase = "main";
     state.currentPlayer = current;
-    state.colourChooser = ordinaryReserveIndices().length ? chooser : current;
+    state.colourChooser = chooser;
     state.protectedPieceId = protectedId;
     state.choosingColour = true;
     state.assignedColour = null;
@@ -825,7 +824,7 @@
     if (state.consequence?.type === "jump-choice" && state.choosingColour) return `${playerName(state.currentPlayer)}: choose which piece you will place after the Jump.`;
     if (state.choosingColour) return ordinaryReserveIndices(state.consequence?.heldIndex).length
       ? `${playerName(state.colourChooser)}: choose a reserve piece/colour for ${playerName(state.currentPlayer)}.`
-      : `${playerName(state.currentPlayer)}: choose a remaining special to place.`;
+      : "No ordinary reserve piece remains.";
     if (state.redeployPiece) return `${playerName(state.currentPlayer)}: place the jumped ${colourName(state.redeployPiece.colour)} piece on any empty square.`;
     if (state.consequence?.type === "move" && state.consequence.step === 2) return `${playerName(state.currentPlayer)}: now place the originally handed ${colourName(state.assignedColour)} piece on any empty square.`;
     if (!canMoveOrJump()) return `${playerName(state.currentPlayer)}: place the ${colourName(state.assignedColour)} piece on any empty square.`;
@@ -849,6 +848,11 @@
         btn.classList.add("reserve-cell");
         if (state.phase === "opening") btn.classList.add("reserve-cell--setup");
         const slot=CORNERS.indexOf(d), active=state.reserve.active[d], locked=state.reserve.locked[d];
+        if (slot >= 0) {
+          renderCornerCounter(btn, slot);
+          boardEl.appendChild(btn);
+          continue;
+        }
         const openingTop = state.phase === "opening" ? state.openingReserve[d] : null;
         if (openingTop) {
           btn.classList.add("corner-stack");
@@ -918,7 +922,8 @@
   function render() {
     applyColours();
     currentEl.textContent = state.winner===null ? playerName(decisionActor()) : "Game over";
-    statusEl.textContent = statusText() + (state.lastReleaseMessage ? ` ${state.lastReleaseMessage}.` : "");
+    statusEl.textContent = statusText() + (match?.pendingCounter !== null && match?.pendingCounter !== undefined ? ` ${playerName(match.pendingCounter)}: ${match.ownerColours[match.pendingCounter]?`take a ${colourName(match.ownerColours[match.pendingCounter])} corner counter`:"choose your counter colour by taking any corner piece"}.` : "") + (state.lastReleaseMessage ? ` ${state.lastReleaseMessage}.` : "");
+    renderMatch();
     state.lastReleaseMessage = "";
 
     const versionTitle = settings.version === "learning" ? "Learning" : settings.version === "extreme" ? "Standard" : "Easy";
@@ -926,7 +931,7 @@
     el("quick-win-rule").innerHTML = settings.version === "extreme"
       ? "<strong>Win:</strong> four in a line, or a tight/spaced Square."
       : "<strong>Win:</strong> make four in a horizontal, vertical or diagonal line.";
-    el("phase-help").textContent = `${ordinaryReserveIndices().length} ordinary pieces remain · ${CORNERS.filter(i => state.reserve.active[i]).length} specials remain.`;
+    el("phase-help").textContent = `${ordinaryReserveIndices().length} ordinary pieces remain · corner counters record game wins.`;
     const consequence = state.consequence;
     const compulsory = consequence
       ? (consequence.type === "move" ? (consequence.step === 1 ? 2 : 1)
@@ -989,8 +994,83 @@
     renderBoard();
   }
 
+  function gameIsInProgress(){
+    if (match && (match.pendingCounter !== null || (match.winner === null && match.scores.some(score=>score>0)))) return true;
+    return !!state && state.winner === null && (state.openingPlaced > 0 || state.board.some(Boolean) || ordinaryReserveIndices().length < 24);
+  }
+  function matchLength() { return [1,3,5].includes(settings.matchLength) ? settings.matchLength : 5; }
+  function cloneMatch() { return match ? {...match,scores:[...match.scores],takenCounters:[...match.takenCounters],cornerColours:[...match.cornerColours],ownerColours:[...match.ownerColours]} : null; }
+  function takeCounter(slot, redraw = true) {
+    if (!match || match.pendingCounter === null || match.takenCounters[slot] !== null || !Number.isInteger(slot) || slot < 0 || slot > 3) return;
+    const winner=match.pendingCounter, colour=match.cornerColours[slot];
+    if(match.ownerColours[winner] && match.ownerColours[winner]!==colour) return;
+    if(!match.ownerColours[winner]) {
+      match.ownerColours[winner]=colour;
+      match.ownerColours[other(winner)]=colour==="black"?"white":"black";
+    }
+    match.takenCounters[slot]=winner;
+    match.pendingCounter=null;
+    if (redraw) { render(); maybeOfferUpdate(); }
+  }
+  function recordMatchResult() {
+    if (!match || state.winner === "draw") return;
+    const winner=state.winner;
+    match.scores[winner]++;
+    if (match.scores[winner] >= (matchLength()+1)/2) match.winner=winner;
+    const free=match.takenCounters.map((owner,i)=>owner===null&&(!match.ownerColours[winner]||match.cornerColours[i]===match.ownerColours[winner])?i:null).filter(i=>i!==null);
+    if (free.length) {
+      match.pendingCounter=winner;
+      if (isComputer(winner)) takeCounter(free[Math.floor(Math.random()*free.length)],false);
+    }
+  }
+  function nextMatchGame() {
+    if (!match || state.winner === null || match.pendingCounter !== null || match.winner !== null) return;
+    clearTimeout(timer); history=[]; resultRecorded=false; recordedResult=null; nextPieceId=1;
+    if (state.winner !== "draw") match.gameNumber++;
+    match.starter=other(match.starter);
+    state=freshState(match.starter);
+    initialiseClock(); render(); processFlow();
+  }
+  function renderMatch() {
+    if (!match) return;
+    const length=matchLength(), target=(length+1)/2;
+    const deciding=match.scores.every(score=>score===target-1);
+    const format=length===1?"Single game":`Best of ${length}`;
+    el("match-score").textContent=`${playerName(0)} ${match.scores[0]} – ${match.scores[1]} ${playerName(1)}`;
+    el("match-progress").textContent=match.winner!==null ? `${playerName(match.winner)} wins ${length===1?"the game":"the match"}!`
+      : state.winner==="draw" ? `${format} · Draw — replay game ${match.gameNumber}`
+      : state.winner!==null ? `${format} · Game ${match.gameNumber} complete`
+      : length>1&&deciding ? `${format} · Deciding game` : `${format} · Game ${match.gameNumber}`;
+    const next=el("next-game");
+    next.hidden=state.winner===null||match.winner!==null;
+    next.disabled=match.pendingCounter!==null;
+    const ownership=match.ownerColours[0]?` · ${playerName(0)} collects ${colourName(match.ownerColours[0])}; ${playerName(1)} collects ${colourName(match.ownerColours[1])}`:" · First winner chooses their counter colour";
+    el("match-progress").textContent+=ownership;
+    next.textContent=state.winner==="draw"?"Replay game":"Next game";
+    el("new-game").textContent=length===1?"New game":"New match";
+    // Finish the winner's counter choice before starting another contest.
+    el("new-game").disabled=match.pendingCounter!==null;
+  }
+  function renderCornerCounter(button,slot) {
+    const owner=match?.takenCounters[slot]??null;
+    const colour=match?.cornerColours[slot]||(["black","white","white","black"][slot]);
+    const chooser=match?.pendingCounter;
+    const available=!!match && chooser!==null && owner===null && (!match.ownerColours[chooser]||match.ownerColours[chooser]===colour);
+    button.classList.add("corner-counter");
+    const label=owner===null?`${colourName(colour)} win counter — never enters play`:`${colourName(colour)} counter taken by ${playerName(owner)}`;
+    if(owner===null){
+      const counter=renderPiece(colour,true);button.appendChild(counter);
+      if(available&&!isComputer(chooser))counter.classList.add("piece--available-reserve");
+    }
+    button.title=label;button.setAttribute("aria-label",available?`${playerName(chooser)}: take this ${colourName(colour)} win counter`:label);
+    if(available&&!isComputer(chooser)){button.classList.add("selectable");button.addEventListener("click",()=>takeCounter(slot));}
+    else button.disabled=true;
+  }
+
   function startGame() {
-    clearTimeout(timer); resultRecorded=false; recordedResult=null; nextPieceId=1; history=[]; state=freshState(); applyColours(); initialiseClock(); render(); processFlow();
+    clearTimeout(timer); resultRecorded=false; recordedResult=null; nextPieceId=1; history=[]; state=freshState();
+    match={scores:[0,0],takenCounters:[null,null,null,null],cornerColours:shuffled(["black","black","white","white"]),ownerColours:[null,null],pendingCounter:null,winner:null,starter:state.currentPlayer,gameNumber:1};
+    applyColours(); initialiseClock(); render(); processFlow();
   }
 
   function playTone(kind="move") {
@@ -1042,7 +1122,7 @@
   function emptyStats(){return{computer:{played:0,won:0,lost:0,drawn:0},two:{played:0,p1:0,p2:0,drawn:0}};}
   function loadStats(){try{const x=JSON.parse(localStorage.getItem(STATS_KEY)||"null"),b=emptyStats();return x?{computer:{...b.computer,...x.computer},two:{...b.two,...x.two}}:b;}catch(_){return emptyStats();}}
   function maybeRecordResult(){
-    if(resultRecorded||state?.winner===null)return; resultRecorded=true; const stats=loadStats();
+    if(resultRecorded||state?.winner===null)return; resultRecorded=true; recordMatchResult(); const stats=loadStats();
     const group=settings.mode==="computer"?"computer":"two";
     const outcome=state.winner==="draw"?"drawn":group==="computer"?(state.winner===0?"won":"lost"):(state.winner===0?"p1":"p2");
     stats[group].played++; stats[group][outcome]++;
@@ -1064,10 +1144,10 @@
     state.phase="main"; state.openingPlaced=4; state.openingRemaining={black:0,white:0}; state.swapDone=true;
     state.board=Array(36).fill(null);
     const fallback=[[1,"black"],[2,"white"],[3,"white"],[4,"black"],[8,"black"],[11,"white"],[12,"black"],[14,"white"],[15,"black"],[16,"black"],[17,"white"],[19,"black"],[20,"black"],[21,"white"],[22,"white"],[23,"black"],[24,"white"],[25,"white"],[26,"white"],[27,"black"],[29,"white"],[31,"black"],[33,"black"],[34,"white"]];
-    fallback.forEach(([i,c])=>state.board[i]={id:nextPieceId++,colour:c,pinned:false,special:false,anchor:false});
-    const specials = CORNERS.map(i => state.reserve.active[i]);
-    state.reserve.active.fill(null); CORNERS.forEach((i,n) => state.reserve.active[i]=specials[n]); state.releasedCorners=[true,true,true,true];
+    fallback.slice(2).forEach(([i,c])=>state.board[i]={id:nextPieceId++,colour:c,pinned:false,special:false,anchor:false});
+    state.reserve.active.fill(null); state.reserve.active[1]="black"; state.reserve.active[2]="white";
     state.currentPlayer=0; state.colourChooser=0; state.choosingColour=true; state.assignedColour=null; state.selectedReserveIndex=null;
+    match={scores:[0,0],takenCounters:[null,null,null,null],cornerColours:shuffled(["black","black","white","white"]),ownerColours:[null,null],pendingCounter:null,winner:null,starter:0,gameNumber:1};
     initialiseClock(); render(); processFlow();
   }
 
@@ -1077,7 +1157,8 @@
   el("swap-sides").addEventListener("click",()=>resolveSwap(true));
   el("choose-handed").addEventListener("click",()=>applyJumpChoice(state.consequence.heldColour));
   el("choose-jumped").addEventListener("click",()=>applyJumpChoice(state.consequence.jumpedPiece.colour));
-  el("new-game").addEventListener("click",startGame); undoBtn.addEventListener("click",undo);
+  el("new-game").addEventListener("click",startGame);
+  el("next-game").addEventListener("click",nextMatchGame); undoBtn.addEventListener("click",undo);
 
   let versionTaps=[]; function handleVersionTap(){const now=Date.now();versionTaps=versionTaps.filter(t=>now-t<=3000);versionTaps.push(now);if(versionTaps.length>=5){versionTaps=[];jumpToEndTest();}}
   [el("app-version"),el("mobile-version")].filter(Boolean).forEach(x=>x.addEventListener("click",handleVersionTap));
@@ -1092,18 +1173,18 @@
   function syncDifficulty(){const n=Number(el("difficulty-input").value),names=["","Beginner","Standard","Expert"];el("difficulty-name").textContent=`${n} · ${names[n]}`;}
   function syncClockOptions(){const enabled=Number(fv("clockMinutes")||0)>0;el("clock-increment-field").disabled=!enabled;if(!enabled)sr("clockIncrement","0");}
   function showStep(n){wizardStep=Math.max(0,Math.min(5,n));wizardSteps.forEach((x,i)=>x.hidden=i!==wizardStep);wizardIndicators.forEach((x,i)=>{x.classList.toggle("wizard-progress-step--active",i===wizardStep);x.classList.toggle("wizard-progress-step--complete",i<wizardStep);});wizardDefault.hidden=wizardStep!==0;wizardBack.hidden=wizardStep===0;wizardNext.hidden=wizardStep===5;wizardSave.hidden=false;if(wizardStep===5)summary();}
-  function summary(){const one=fv("gameMode")==="computer",mins=Number(fv("clockMinutes")||0),inc=Number(fv("clockIncrement")||0),clock=mins?`${mins} min each${inc?` + ${inc}s`:""}`:"Clock off";el("setup-summary").textContent=`Lipfty · ${one?"Player vs Computer":"Two players"} · ${COLOURS[fv("colour1")][0]} / ${COLOURS[fv("colour2")][0]} · ${(fv("gameVersion")||"standard").replace(/^./,c=>c.toUpperCase())} · ${clock}`;}
-  function loadForm(){sr("gameMode",settings.mode);el("difficulty-input").value=settings.level==="beginner"?1:settings.level==="expert"?3:2;sr("allowUndo",settings.undo?"yes":"no");sr("colour1",settings.colour1);sr("colour2",settings.colour2);sr("gameVersion",settings.version);el("setting-player1").value=settings.player1||"Player";el("setting-player2").value=settings.player2||"Player 2";sr("starter",settings.starter);sr("clockMinutes",String(settings.clockMinutes||0));sr("clockIncrement",String(settings.clockIncrement||0));el("setting-sound").checked=settings.sound!==false;el("setting-animations").checked=settings.animations!==false;el("setting-language").value=settings.language||"en-GB";syncMode();syncDifficulty();syncClockOptions();showStep(0);}
+  function summary(){const one=fv("gameMode")==="computer",mins=Number(fv("clockMinutes")||0),inc=Number(fv("clockIncrement")||0),clock=mins?`${mins} min each${inc?` + ${inc}s`:""}`:"Clock off";el("setup-summary").textContent=`Lipfty · ${one?"Player vs Computer":"Two players"} · ${COLOURS[fv("colour1")][0]} / ${COLOURS[fv("colour2")][0]} · ${({learning:"Learning",standard:"Easy",extreme:"Standard"})[fv("gameVersion")||"standard"]} · ${Number(fv("matchLength"))===1?"Single game":`Best of ${fv("matchLength")||5}`} · ${clock}`;}
+  function loadForm(){sr("gameMode",settings.mode);el("difficulty-input").value=settings.level==="beginner"?1:settings.level==="expert"?3:2;sr("allowUndo",settings.undo?"yes":"no");sr("colour1",settings.colour1);sr("colour2",settings.colour2);sr("gameVersion",settings.version);sr("matchLength",String(settings.matchLength));el("setting-player1").value=settings.player1||"Player";el("setting-player2").value=settings.player2||"Player 2";sr("starter",settings.starter);sr("clockMinutes",String(settings.clockMinutes||0));sr("clockIncrement",String(settings.clockIncrement||0));el("setting-sound").checked=settings.sound!==false;el("setting-animations").checked=settings.animations!==false;el("setting-language").value=settings.language||"en-GB";syncMode();syncDifficulty();syncClockOptions();showStep(0);}
   function setDefaultForm(){
     const d=defaultSettings();
     sr("gameMode",d.mode); el("difficulty-input").value=d.level==="beginner"?1:d.level==="expert"?3:2;
-    sr("allowUndo",d.undo?"yes":"no"); sr("colour1",d.colour1); sr("colour2",d.colour2); sr("gameVersion",d.version);
+    sr("allowUndo",d.undo?"yes":"no"); sr("colour1",d.colour1); sr("colour2",d.colour2); sr("gameVersion",d.version); sr("matchLength",String(d.matchLength));
     el("setting-player1").value=d.player1; el("setting-player2").value=d.player2; sr("starter",d.starter);
     sr("clockMinutes",String(d.clockMinutes)); sr("clockIncrement",String(d.clockIncrement));
     el("setting-sound").checked=d.sound; el("setting-animations").checked=d.animations; el("setting-language").value=d.language;
     syncMode(); syncDifficulty(); syncClockOptions();
   }
-  function commitSettings(){const c1=fv("colour1"),c2=fv("colour2");if(!c1||!c2||c1===c2){showStep(1);statusEl.textContent="Choose two different piece colours.";return false;}const n=Number(el("difficulty-input").value);settings={...settings,mode:fv("gameMode"),level:n===1?"beginner":n===3?"expert":"standard",version:fv("gameVersion")||"standard",starter:fv("starter")||"random",player1:el("setting-player1").value.trim()||"Player",player2:el("setting-player2").value.trim()||"Player 2",colour1:c1,colour2:c2,clockMinutes:Number(fv("clockMinutes")||0),clockIncrement:Number(fv("clockIncrement")||0),sound:el("setting-sound").checked,animations:el("setting-animations").checked,language:el("setting-language").value,undo:fv("allowUndo")==="yes",colourDefaultsVersion:1403};saveSettings();settingsDialog.close();startGame();return true;}
+  function commitSettings(){const c1=fv("colour1"),c2=fv("colour2");if(!c1||!c2||c1===c2){showStep(1);statusEl.textContent="Choose two different piece colours.";return false;}const n=Number(el("difficulty-input").value);settings={...settings,mode:fv("gameMode"),level:n===1?"beginner":n===3?"expert":"standard",version:fv("gameVersion")||"standard",matchLength:[1,3,5].includes(Number(fv("matchLength")))?Number(fv("matchLength")):5,starter:fv("starter")||"random",player1:el("setting-player1").value.trim()||"Player",player2:el("setting-player2").value.trim()||"Player 2",colour1:c1,colour2:c2,clockMinutes:Number(fv("clockMinutes")||0),clockIncrement:Number(fv("clockIncrement")||0),sound:el("setting-sound").checked,animations:el("setting-animations").checked,language:el("setting-language").value,undo:fv("allowUndo")==="yes",colourDefaultsVersion:1403};saveSettings();settingsDialog.close();startGame();return true;}
   el("settings-button").addEventListener("click",()=>{loadForm();settingsDialog.showModal();});el("close-settings").addEventListener("click",()=>settingsDialog.close());wizardBack.addEventListener("click",()=>showStep(wizardStep-1));wizardNext.addEventListener("click",()=>{if(wizardStep===1&&fv("colour1")===fv("colour2")){statusEl.textContent="Choose two different piece colours.";return;}showStep(wizardStep+1);});wizardDefault.addEventListener("click",setDefaultForm);settingsForm.addEventListener("submit",e=>{e.preventDefault();commitSettings();});
   wizardIndicators.forEach((x,i)=>{x.setAttribute("role","button");x.tabIndex=0;x.addEventListener("click",()=>showStep(i));x.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();showStep(i);}});});
   settingsForm.querySelectorAll('[name="gameMode"]').forEach(x=>x.addEventListener("change",syncMode));el("difficulty-input").addEventListener("input",syncDifficulty);settingsForm.querySelectorAll('[name="clockMinutes"]').forEach(x=>x.addEventListener("change",syncClockOptions));
@@ -1111,13 +1192,10 @@
   el("help-button").addEventListener("click",()=>el("help-dialog").showModal());el("close-help").addEventListener("click",()=>el("help-dialog").close());
   el("view-statistics-button").addEventListener("click",()=>{renderStatistics();el("statistics-dialog").showModal();});el("close-statistics").addEventListener("click",()=>el("statistics-dialog").close());el("reset-statistics").addEventListener("click",()=>{if(confirm("Reset all Lipfty statistics on this device?")){localStorage.removeItem(STATS_KEY);renderStatistics();}});
 
-  fetch("./build-info.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(info=>{const v=info?.version||"16.0.3";el("app-version").textContent=`Version ${v}`;el("mobile-version").textContent=`v${v}`;const ref=info?.commit||info?.gitCommit||"";el("build-reference").textContent=ref?` · ${String(ref).slice(0,7)}`:"";}).catch(()=>{el("app-version").textContent="Version 16.0.3";});
+  fetch("./build-info.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(info=>{const v=info?.version||"16.0.4";el("app-version").textContent=`Version ${v}`;el("mobile-version").textContent=`v${v}`;const ref=info?.commit||info?.gitCommit||"";el("build-reference").textContent=ref?` · ${String(ref).slice(0,7)}`:"";}).catch(()=>{el("app-version").textContent="Version 16.0.4";});
   let pendingUpdateRegistration = null;
   let updatePromptHandled = false;
   let reloadingForUpdate = false;
-  function gameIsInProgress(){
-    return !!state && state.winner === null && (state.openingPlaced > 0 || state.board.some(Boolean) || ordinaryReserveIndices().length < 24);
-  }
   function maybeOfferUpdate(){
     const registration = pendingUpdateRegistration;
     if (updatePromptHandled || !registration?.waiting || gameIsInProgress()) return;

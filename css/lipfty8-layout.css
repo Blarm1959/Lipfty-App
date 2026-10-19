@@ -77,12 +77,12 @@
     justify-content: flex-start;
   }
 
-  /* Height as well as width now limits the board. 190px leaves room for the
+  /* Height as well as width now limits the board. 250px leaves room for the match score,
      title, turn strip, command bar, gaps and the board caption. */
   .board-frame {
     flex: 0 0 auto;
     height: auto;
-    width: min(100%, 600px, calc(100dvh - 190px));
+    width: min(100%, 600px, calc(100dvh - 250px));
     max-width: 600px;
     padding: 5px;
     border-width: 3px;
@@ -290,3 +290,14 @@
 
 @media(min-width:1121px){.reserve-panel{grid-column:1;grid-row:1}.stage-info-card{grid-column:1;grid-row:2;margin-top:-6px}.board-section{grid-column:2;grid-row:1/span 2}.rules-panel{grid-column:3;grid-row:1/span 2}}
 
+
+
+/* Match score; corner counters retain the existing squarish piece design. */
+.match-banner{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:.3rem 1rem;padding:.55rem .8rem;background:#fff;border:1px solid #bfd0e0;border-radius:12px;color:#173b67}
+.match-banner strong{font-size:1rem}.match-banner span{font-size:.8rem}
+.cell.corner-counter{cursor:default}.cell.corner-counter.selectable{cursor:pointer}
+.action-bar-left{display:flex;flex-wrap:wrap;gap:.5rem}
+@media(min-width:561px){.game-layout{grid-template-rows:auto auto minmax(0,1fr) auto}}
+@media(max-width:600px){.match-banner{padding:.45rem .6rem;grid-column:1/-1!important;order:0}.match-banner strong{font-size:.9rem}.match-banner span{font-size:.75rem}}
+
+@media(max-width:560px){.game-layout{grid-template-rows:none;grid-auto-rows:auto}}

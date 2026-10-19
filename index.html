@@ -37,6 +37,10 @@
         <div class="turn-message-card"><p id="status">Starting Lipfty…</p></div>
       </section>
 
+      <section class="match-banner" aria-live="polite" aria-label="Match score">
+        <strong id="match-score"></strong><span id="match-progress"></span>
+      </section>
+
       <section class="game-stage">
         <aside class="reserve-panel">
           <h2 id="reserve-heading">Colour to use</h2>
@@ -55,7 +59,7 @@
         <section class="board-section">
           <div class="board-frame">
             <div id="board" class="board" role="grid" aria-label="Lipfty eight by eight board with inner six by six playing area"></div>
-            <p class="board-note">Lipfty: inner 6×6 playing area, 24 ordinary reserve pieces and four shaped special pieces.</p>
+            <p class="board-note">Lipfty: inner 6×6 playing area, 24 ordinary reserve pieces. Four squarish corner counters record wins; the first winner chooses their counter colour.</p>
           </div>
           <div id="swap-box" class="decision-box" hidden>
             <strong>Accept the first placement or take the position?</strong>
@@ -70,18 +74,18 @@
 
         <aside class="rules-panel rules-panel--quick">
           <h2 id="quick-rules-title">Lipfty · Easy</h2>
-          <p id="quick-opening-rule"><strong>Start:</strong> empty inner 6×6; one special at each outside corner.</p>
+          <p id="quick-opening-rule"><strong>Start:</strong> empty inner 6×6; 24 shared reserve pieces.</p>
           <p><strong>Your turn:</strong> use the reserve colour handed to you to <strong>Place</strong>, <strong>Move</strong> one adjacent square, or make one opposite-colour <strong>Jump</strong>.</p>
           <p id="quick-win-rule"><strong>Win:</strong> make four in a horizontal, vertical or diagonal line.</p>
-          <p><strong>Specials:</strong> ordinary reserves first. Specials are Place only and permanently fixed. At the end choose your own special.</p>
+          <p><strong>Match:</strong> Single game, Best of 3 or Best of 5. Win a game, take a corner counter of your colour. First to the required wins takes the match; draws are replayed.</p>
           <p class="panel-help"><strong>?</strong> opens the complete Lipfty rules.</p>
         </aside>
       </section>
 
       <section class="action-bar">
-        <div class="action-bar-left"><button class="button button--primary" id="new-game" type="button">New game</button></div>
+        <div class="action-bar-left"><button class="button button--primary" id="next-game" type="button" hidden>Next game</button><button class="button button--secondary" id="new-game" type="button">New match</button></div>
         <div class="action-bar-centre"><button class="button button--secondary" id="undo" type="button">Undo</button></div>
-        <div class="build-info"><span id="app-version">Version 16.0.3</span><span id="build-reference"></span></div>
+        <div class="build-info"><span id="app-version">Version 16.0.4</span><span id="build-reference"></span></div>
       </section>
     </main>
   </div>
@@ -115,6 +119,11 @@
 
       <section class="wizard-step" data-wizard-step="2" hidden>
         <h3>Choose game version</h3>
+        <fieldset class="setup-fieldset"><legend>Match length</legend><div class="choice-grid">
+          <label><input name="matchLength" type="radio" value="1"><span>Single game</span></label>
+          <label><input name="matchLength" type="radio" value="3"><span>Best of 3</span></label>
+          <label><input checked name="matchLength" type="radio" value="5"><span>Best of 5</span></label>
+        </div><p class="setup-help">First to 1, 2 or 3 wins. Draws are replayed. Starting players alternate within a match.</p></fieldset>
         <fieldset class="setup-fieldset"><legend>Version</legend><div class="mode-choice-grid version-choice-grid">
           <label class="mode-choice"><input name="gameVersion" type="radio" value="learning"><span><strong>Learning</strong><small>Placement only · line wins</small></span></label>
           <label class="mode-choice"><input checked name="gameVersion" type="radio" value="standard"><span><strong>Easy</strong><small>Place, Move and Jump · line wins</small></span></label>
@@ -125,7 +134,7 @@
       <section class="wizard-step" data-wizard-step="3" hidden>
         <h3>Who is playing?</h3>
         <div class="setup-grid setup-grid--players"><label class="field-label"><span id="player1-label-text">Player name</span><input class="text-input" id="setting-player1" maxlength="24"></label><label class="field-label" id="player2-label"><span>Player 2 name</span><input class="text-input" id="setting-player2" maxlength="24"></label></div>
-        <fieldset class="setup-fieldset"><legend>Who starts?</legend><div class="choice-grid"><label><input checked name="starter" type="radio" value="random"><span>Random</span></label><label><input name="starter" type="radio" value="alternate"><span>Alternate each game</span></label><label><input name="starter" type="radio" value="player"><span id="starter-player-label">Player</span></label><label><input name="starter" type="radio" value="computer"><span id="starter-other-label">Computer</span></label></div></fieldset>
+        <fieldset class="setup-fieldset"><legend>Who starts the match?</legend><div class="choice-grid"><label><input checked name="starter" type="radio" value="random"><span>Random</span></label><label><input name="starter" type="radio" value="alternate"><span>Alternate matches</span></label><label><input name="starter" type="radio" value="player"><span id="starter-player-label">Player</span></label><label><input name="starter" type="radio" value="computer"><span id="starter-other-label">Computer</span></label></div></fieldset>
       </section>
 
       <section class="wizard-step" data-wizard-step="4" hidden>
@@ -150,14 +159,15 @@
 
   <dialog id="help-dialog"><div class="dialog-heading"><div><p class="dialog-eyebrow">How to play</p><h2>Lipfty</h2></div><button class="dialog-close" id="close-help" type="button" aria-label="Close">×</button></div><div class="rules-copy"><p><a href="Lipfty-Rules.pdf" target="_blank" rel="noopener">Printable rules (PDF)</a> · <a href="Lipfty-Rules.md" target="_blank" rel="noopener">Rules source (Markdown)</a></p>
     <p><strong>Objective.</strong> Complete four of one colour in a line; Standard also allows tight and spaced axis-aligned squares. Colours are shared.</p>
-    <p><strong>Setup.</strong> The inner 6×6 starts empty. Put 24 ordinary pieces on the outside edges and one shaped special at each physical corner: two of each colour. No Opening Four.</p>
+    <p><strong>Setup.</strong> The inner 6×6 starts empty. Put 24 ordinary pieces on the outside edges, 12 of each colour. The four physical corners hold win counters only; they never enter play. No Opening Four.</p>
     <p><strong>First placement.</strong> Keep the Accept / Take position choice. Click the first board piece to Take position or an available ordinary outside piece to Accept and select it.</p>
     <p><strong>Normal play.</strong> The opponent selects an ordinary reserve piece. Place it, Move an unpinned board piece of that colour one adjacent square, or Jump over one adjacent opposite-colour unpinned piece. Learning is Place only. When only one reserve colour is available, it is selected automatically; the player taking the turn still chooses their action.</p>
-    <p><strong>Move consequence.</strong> The opponent chooses and places another ordinary reserve piece; the mover places the exact held piece. If that held piece is the last ordinary reserve, the opponent chooses a corner special for their placement.</p>
-    <p><strong>Jump consequence.</strong> The opponent chooses and places either the exact held piece or exact jumped piece; the jumper places the other. No corner replacement.</p>
-    <p><strong>Specials.</strong> Ordinary choices take priority while any remain. A special never permits Move/Jump. Once placed it counts towards wins but cannot Move, Jump or be jumped over. At the end, the current player chooses and places their own remaining special.</p>
-    <p><strong>Endgame.</strong> Move/Jump continues even with one ordinary reserve colour left. Finish compulsory placements. Draw when all reserves are used without a win, or a compulsory placement cannot be completed.</p>
+    <p><strong>Move consequence.</strong> The opponent chooses and places another ordinary reserve piece; the mover places the exact held piece. A Move requires another ordinary reserve besides the held piece. With only one reserve left, Place or an otherwise legal Jump is available.</p>
+    <p><strong>Jump consequence.</strong> The opponent chooses and places either the exact held piece or exact jumped piece; the jumper places the other. No corner counter is used in either placement.</p>
+    <p><strong>Matches and corner counters.</strong> Choose Single game, Best of 3 or Best of 5 (default) in Settings. First to 1, 2 or 3 wins takes the match. The corners keep their squarish pieces: two of each shared-piece colour. The first winner clicks any corner piece to take it and choose their counter colour; the opponent then collects the other colour. Subsequent winners take a remaining counter of their own colour. Taken counters disappear from the corners. The computer takes an eligible counter automatically. A third win ends Best of 5 without needing a third counter of that colour; at 2–2, the fifth game is the decider. Counter ownership never restricts ordinary shared-piece colours. Draws award no counter and replay the same numbered game. Starting players alternate after every game, including a draw; Accept/Take remains available.</p>
+    <p><strong>Endgame.</strong> Move/Jump continues even with one ordinary reserve colour left. Finish compulsory placements. Draw when all ordinary reserves are used without a win, or a compulsory placement cannot be completed.</p>
     <p><strong>Wins and protection.</strong> Check after every placement, Move, Jump and redeployment; a win stops the sequence. The moving piece is protected during its consequence and the opponent’s following normal turn.</p>
+    <p><strong>Continuing.</strong> After taking a counter, click Next game; after a draw, click Replay game. New match resets the score and counters. Applying Settings starts a new match. Clocks reset for each game; statistics continue to count individual games.</p>
     <p><strong>Clock and Undo.</strong> Time expiry loses. Undo restores position, clock and statistics and returns to a human decision against the computer.</p>
   </div></dialog>
 
