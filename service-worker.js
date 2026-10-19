@@ -1,4 +1,4 @@
-const VERSION = "17.0.2";
+const VERSION = "17.0.3";
 const CACHE = `lipfty-v${VERSION}`;
 const ASSETS = [
   "./", "./index.html", "./offline.html", "./css/style.css", "./css/lipfty8-layout.css",
