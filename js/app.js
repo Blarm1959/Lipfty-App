@@ -967,7 +967,9 @@
       if (state.choosingColour) return `${playerName(state.colourChooser)}: choose the colour ${playerName(state.currentPlayer)} must place as an Opening Four piece.`;
       return `${playerName(state.currentPlayer)}: place the ${colourName(state.assignedColour)} Opening Four piece on any empty 6×6 corner.`;
     }
-    if (state.consequence?.type === "jump-choice" && state.choosingColour) return `${playerName(state.currentPlayer)}: choose which piece you will place after the Jump.`;
+    if (state.consequence?.type === "jump-choice" && state.choosingColour) return `${playerName(state.currentPlayer)}: choose which piece to place after ${playerName(state.consequence.jumper)}'s Jump. Both pieces must be placed before the corner returns.`;
+    if (state.consequence?.type === "move" && state.consequence.step === 1 && state.choosingColour)
+      return `${playerName(state.currentPlayer)}: after ${playerName(state.consequence.mover)}'s Move, choose a reserve piece for your compulsory placement. Their corner returns after both compulsory placements.`;
     if (state.choosingColour && state.finalFourPhase) return `${playerName(state.currentPlayer)}: choose a Final Four corner piece to place. No Move or Jump.`;
     if (state.choosingColour) return ordinaryReserveIndices(state.consequence?.heldIndex).length
       ? state.heldCorners.every(piece=>piece===null)
@@ -1095,7 +1097,9 @@
       el(`qualification-status-${player}`).textContent = returned
         ? `${colour ? colourName(colour) + " · " : ""}Returned — can win`
         : state.qualified[player]
-          ? "Move/Jump completed — return piece"
+          ? state.pendingReturnPlayer === player && state.consequence
+            ? "Move/Jump completed — finish compulsory placements, then corner returns"
+            : "Move/Jump completed — return piece"
           : held ? `${colourName(held.colour)} · Move/Jump needed` : "First colour not yet chosen";
     }
   }

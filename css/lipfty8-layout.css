@@ -317,3 +317,32 @@
 @media(min-width:901px) and (max-width:1120px){
   .rules-panel{display:none}
 }
+
+/* Lipfty v18.0.6: show qualification under the full-width right-hand instructions.
+   Compulsory-placement warnings share that column. */
+.stage-info-card[hidden],.placement-alert[hidden]{display:none!important}
+.stage-info-card .panel-help{display:none}
+.stage-info-card{width:100%;min-width:0}
+@media(min-width:1121px){
+  .game-stage{grid-template-rows:auto auto minmax(0,1fr)}
+  .reserve-panel{grid-column:1;grid-row:1}
+  .board-section{grid-column:2;grid-row:1/span 3}
+  .rules-panel{grid-column:3;grid-row:1}
+  .qualification-panel{grid-column:3;grid-row:2;min-width:0;padding:10px 12px}
+  .stage-info-card{grid-column:3;grid-row:3;margin-top:0;align-self:start}
+}
+@media(min-width:901px) and (max-width:1120px){
+  .game-stage{grid-template-rows:auto auto minmax(0,1fr)}
+  .rules-panel{display:none}
+  .reserve-panel{grid-column:1;grid-row:1}
+  .qualification-panel{grid-column:1;grid-row:2;min-width:0;padding:10px 12px}
+  .stage-info-card{grid-column:1;grid-row:3;margin-top:0}
+  .board-section{grid-column:2;grid-row:1/span 3}
+}
+@media(min-width:561px) and (max-width:900px){
+  .board-section{order:1}
+  .reserve-panel{order:2}
+  .rules-panel{order:3}
+  .qualification-panel{order:4}
+  .stage-info-card{order:5}
+}
