@@ -57,11 +57,11 @@
           <div class="qualification-rows">
             <div class="qualification-row" id="qualification-row-0">
               <span class="piece piece--special qualification-token qualification-token--unassigned" id="qualification-piece-0" aria-hidden="true"></span>
-              <span class="qualification-copy"><strong id="qualification-name-0">Player</strong><small id="qualification-status-0">Choosing corner piece…</small></span>
+              <span class="qualification-copy"><strong id="qualification-name-0">Player</strong><small id="qualification-status-0">First colour not yet chosen</small></span>
             </div>
             <div class="qualification-row" id="qualification-row-1">
               <span class="piece piece--special qualification-token qualification-token--unassigned" id="qualification-piece-1" aria-hidden="true"></span>
-              <span class="qualification-copy"><strong id="qualification-name-1">Computer</strong><small id="qualification-status-1">Choosing corner piece…</small></span>
+              <span class="qualification-copy"><strong id="qualification-name-1">Computer</strong><small id="qualification-status-1">First colour not yet chosen</small></span>
             </div>
           </div>
         </section>
@@ -89,7 +89,7 @@
 
         <aside class="rules-panel rules-panel--quick">
           <h2 id="quick-rules-title">Lipfty · Easy</h2>
-          <p id="quick-opening-rule"><strong>Start:</strong> four pinned inner corners; each player takes one outer special. Return yours after your first Move or Jump.</p>
+          <p id="quick-opening-rule"><strong>Start:</strong> choose the first reserve colour for the opponent. They hold that colour’s corner piece and you hold the opposite colour. Both colours stay fixed after Accept/Take.</p>
           <p><strong>Your turn:</strong> use the handed colour to <strong>Place</strong>, <strong>Move</strong> or <strong>Jump</strong>. You cannot win until you have completed a Move or Jump.</p>
           <p id="quick-win-rule"><strong>Win:</strong> make four in a horizontal, vertical or diagonal line.</p>
           <p><strong>Match:</strong> Single game, Best of 3 or Best of 5. Win a game to gain a match point. First to the required wins takes the match; draws are replayed.</p>
@@ -174,8 +174,8 @@
 
   <dialog id="help-dialog"><div class="dialog-heading"><div><p class="dialog-eyebrow">How to play</p><h2>Lipfty</h2></div><button class="dialog-close" id="close-help" type="button" aria-label="Close">×</button></div><div class="rules-copy"><p><a href="Lipfty-Rules.pdf" target="_blank" rel="noopener">Printable rules (PDF)</a> · <a href="Lipfty-Rules.md" target="_blank" rel="noopener">Rules source (Markdown)</a></p>
     <p><strong>Objective.</strong> After you have completed at least one Move or Jump, make four of either shared colour in a line; Standard also allows tight or spaced axis-aligned squares. Your opponent need not have qualified.</p>
-    <p><strong>Setup.</strong> Four pinned pieces start on the inner 6×6 corners, with matching colours diagonally opposite. Place 24 ordinary reserves (12 of each colour) and four shaped specials (two per colour) on the outside. The chosen starter hands the opponent an ordinary reserve colour. That opponent takes a matching-colour outside special. The starter takes a special of either remaining colour. Each holds their own special until their first Move or Jump.</p>
-    <p><strong>First placement.</strong> After both specials have been taken, the recipient of the opening colour places the ordinary piece. Their opponent then chooses Accept or Take position. The piece stays where placed. Subsequent colours remain opponent-selected.</p>
+    <p><strong>Setup.</strong> Four pinned pieces start on the inner 6×6 corners, with matching colours diagonally opposite. Place 24 ordinary reserves (12 of each colour) and four shaped specials (two per colour) on the outside. The starting chooser picks the first ordinary reserve colour for the opponent, who becomes the first placer. That colour also fixes the opponent’s held special; the chooser automatically holds the opposite-colour special. The other two specials remain on the outer corners. Neither player makes a separate special-piece choice.</p>
+    <p><strong>First placement.</strong> The opponent places the first ordinary piece of the chosen colour. The chooser then selects Accept or Take position. The first piece stays where placed and both players keep their already-assigned held special colours, regardless of the decision. Subsequent ordinary colours remain opponent-selected.</p>
     <p><strong>Normal play.</strong> The opponent selects an ordinary reserve piece. Place it, Move an unpinned board piece of that colour one adjacent square or Jump over one adjacent opposite-colour unpinned piece. Your first successful Move/Jump qualifies you to win. After its compulsory placements, return your held special to any empty outside corner. You may Move and Jump again freely. A winning Move/Jump ends the game immediately and automatically returns your earned special.</p>
     <p><strong>Move consequence.</strong> The opponent chooses and places another ordinary reserve piece; the mover places the exact held piece. A Move requires another ordinary reserve besides the held piece. With only one reserve left, Place or an otherwise legal Jump is available.</p>
     <p><strong>Jump consequence.</strong> The opponent chooses and places either the exact held piece or exact jumped piece; the jumper places the other. Final Four pieces are not used during compulsory placements.</p>
