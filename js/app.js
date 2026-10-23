@@ -388,18 +388,26 @@
   function nextNormalTurn(current, chooser, protectedId = null) {
     // A newly earned corner is returned after *both* compulsory placements.
     if (state.pendingReturnPlayer !== null) {
-      state.deferredTurn = {current,chooser,protectedId};
-      state.cornerReturnFor = state.pendingReturnPlayer;
-      state.pendingReturnPlayer = null;
-      state.currentPlayer = state.cornerReturnFor;
-      state.choosingColour = false;
-      state.assignedColour = null;
-      state.selectedReserveIndex = null;
-      state.consequence = null;
-      state.redeployPiece = null;
-      clearSelection();
-      render(); processFlow();
-      return;
+      const player = state.pendingReturnPlayer;
+      // Computer returns automatically to the first empty outside corner.
+      if (isComputer(player)) {
+        const empty = CORNERS.find(i => !state.reserve.locked[i]);
+        if (empty !== undefined) putHeldCorner(player, empty);
+        state.pendingReturnPlayer = null;
+      } else {
+        state.deferredTurn = {current,chooser,protectedId};
+        state.cornerReturnFor = player;
+        state.pendingReturnPlayer = null;
+        state.currentPlayer = state.cornerReturnFor;
+        state.choosingColour = false;
+        state.assignedColour = null;
+        state.selectedReserveIndex = null;
+        state.consequence = null;
+        state.redeployPiece = null;
+        clearSelection();
+        render(); processFlow();
+        return;
+      }
     }
     // Under v18 the first colour exhausted is the qualification deadline.
     if (ordinaryReserveIndices().length < 24 &&
@@ -1142,8 +1150,10 @@
       ? (consequence.type === "move" ? (consequence.step === 1 ? 2 : 1)
         : ["jump-choice", "jump-redeploy-first", "jump-held-first"].includes(consequence.type) ? 2 : 1)
       : 0;
-    el("placement-alert").hidden = compulsory === 0 || state.winner !== null;
+    const showPlacementAlert = compulsory > 0 && state.winner === null;
+    el("placement-alert").hidden = !showPlacementAlert;
     el("placement-alert").textContent = `COMPULSORY PLACEMENT · ${compulsory} remaining`;
+    el("stage-info-card").hidden = !showPlacementAlert;
 
     blackBtn.querySelector("strong").textContent=colourName("black");
     whiteBtn.querySelector("strong").textContent=colourName("white");
