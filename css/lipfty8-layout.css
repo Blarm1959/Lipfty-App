@@ -301,3 +301,19 @@
 @media(max-width:600px){.match-banner{padding:.45rem .6rem;grid-column:1/-1!important;order:0}.match-banner strong{font-size:.9rem}.match-banner span{font-size:.75rem}}
 
 @media(max-width:560px){.game-layout{grid-template-rows:none;grid-auto-rows:auto}}
+
+/* Lipfty v18.0.3: restore the full-width right instructions;
+   stack the qualification card beneath Colour to use on the left. */
+@media(min-width:901px){
+  .game-stage{grid-template-rows:auto auto minmax(0,1fr)}
+  .reserve-panel{grid-column:1;grid-row:1}
+  .qualification-panel{grid-column:1;grid-row:2;min-width:0;padding:10px 12px}
+  .qualification-help{margin-bottom:8px}
+  .qualification-row{padding:8px}
+  .stage-info-card{grid-column:1;grid-row:3;margin-top:0}
+  .board-section{grid-column:2;grid-row:1/span 3}
+  .rules-panel{grid-column:3;grid-row:1/span 3;min-width:0}
+}
+@media(min-width:901px) and (max-width:1120px){
+  .rules-panel{display:none}
+}

@@ -1263,7 +1263,7 @@
     const ownership=match.ownerColours[0]?` · ${playerName(0)} collects ${colourName(match.ownerColours[0])}; ${playerName(1)} collects ${colourName(match.ownerColours[1])}`:" · First winner chooses their counter colour";
     el("match-progress").textContent+=ownership;
     next.textContent=state.winner==="draw"?"Replay game":"Next game";
-    el("new-game").textContent=length===1?"New game":"New match";
+    el("new-game").textContent="New game";
     // Finish the winner's counter choice before starting another contest.
     el("new-game").disabled=match.pendingCounter!==null;
   }

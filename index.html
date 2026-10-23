@@ -51,6 +51,21 @@
           <p id="reserve-info" class="reserve-info"></p>
         </aside>
 
+        <section class="qualification-panel" aria-label="Move or Jump requirement" aria-live="polite">
+          <h2>Move / Jump requirement</h2>
+          <p class="qualification-help">Return your held corner piece after your first Move or Jump to become eligible to win.</p>
+          <div class="qualification-rows">
+            <div class="qualification-row" id="qualification-row-0">
+              <span class="piece piece--special qualification-token qualification-token--unassigned" id="qualification-piece-0" aria-hidden="true"></span>
+              <span class="qualification-copy"><strong id="qualification-name-0">Player</strong><small id="qualification-status-0">Choosing corner piece…</small></span>
+            </div>
+            <div class="qualification-row" id="qualification-row-1">
+              <span class="piece piece--special qualification-token qualification-token--unassigned" id="qualification-piece-1" aria-hidden="true"></span>
+              <span class="qualification-copy"><strong id="qualification-name-1">Computer</strong><small id="qualification-status-1">Choosing corner piece…</small></span>
+            </div>
+          </div>
+        </section>
+
         <aside class="stage-info-card" id="stage-info-card">
           <p class="panel-help" id="phase-help">Empty inner 6×6 start.</p>
           <p class="placement-alert" id="placement-alert" hidden></p>
@@ -72,7 +87,6 @@
           </div>
         </section>
 
-        <div class="rules-column">
         <aside class="rules-panel rules-panel--quick">
           <h2 id="quick-rules-title">Lipfty · Easy</h2>
           <p id="quick-opening-rule"><strong>Start:</strong> four pinned inner corners; each player takes one outer special. Return yours after your first Move or Jump.</p>
@@ -81,25 +95,10 @@
           <p><strong>Match:</strong> Single game, Best of 3 or Best of 5. Win a game to gain a match point. First to the required wins takes the match; draws are replayed.</p>
           <p class="panel-help"><strong>?</strong> opens the complete Lipfty rules.</p>
         </aside>
-        <section class="qualification-panel" aria-label="Move or Jump requirement" aria-live="polite">
-          <h2>Move / Jump requirement</h2>
-          <p class="qualification-help">Return your held corner piece after your first Move or Jump to become eligible to win.</p>
-          <div class="qualification-rows">
-            <div class="qualification-row" id="qualification-row-0">
-              <span class="piece piece--special qualification-token qualification-token--unassigned" id="qualification-piece-0" aria-hidden="true"></span>
-              <span class="qualification-copy"><strong id="qualification-name-0">Player</strong><small id="qualification-status-0">Choosing corner piece…</small></span>
-            </div>
-            <div class="qualification-row" id="qualification-row-1">
-              <span class="piece piece--special qualification-token qualification-token--unassigned" id="qualification-piece-1" aria-hidden="true"></span>
-              <span class="qualification-copy"><strong id="qualification-name-1">Computer</strong><small id="qualification-status-1">Choosing corner piece…</small></span>
-            </div>
-          </div>
-        </section>
-        </div>
       </section>
 
       <section class="action-bar">
-        <div class="action-bar-left"><button class="button button--primary" id="next-game" type="button" hidden>Next game</button><button class="button button--secondary" id="new-game" type="button">New match</button></div>
+        <div class="action-bar-left"><button class="button button--primary" id="next-game" type="button" hidden>Next game</button><button class="button button--secondary" id="new-game" type="button">New game</button></div>
         <div class="action-bar-centre"><button class="button button--secondary" id="undo" type="button">Undo</button></div>
         <div class="build-info"><span id="app-version">Version 16.0.4</span><span id="build-reference"></span></div>
       </section>
@@ -183,7 +182,7 @@
     <p><strong>Deadline and Final Four.</strong> After compulsory placements are finished, if either ordinary reserve colour runs out and one player has not qualified, that player loses. If neither qualified, the initial ordinary placer loses. Otherwise Move/Jump ends at this one-colour cutoff, and the remaining ordinary pieces are Place-only. Once all ordinary pieces are used, the four outside specials enter the 6×6 one at a time, permanently pinned. If they are all used without a winner, the game is a draw.</p>
     <p><strong>Matches.</strong> Single game, Best of 3 or Best of 5; scores are separate from the four physical playing specials. Draws replay the same game; starting colour-choosers alternate.</p>
     <p><strong>Wins and protection.</strong> A four-piece pattern wins only if the acting player has already completed a Move or Jump, including the action currently being performed. A win cancels all remaining compulsory placements. The moved/jumped piece is temporarily protected, as in v17.</p>
-    <p><strong>Continuing.</strong> After a win, click Next game; after a draw, click Replay game. New match resets the score and all playing reserves. Applying Settings starts a new match. Clocks reset for each game; statistics continue to count individual games.</p>
+    <p><strong>Continuing.</strong> After a win, click Next game; after a draw, click Replay game. New Game starts a fresh match, resetting the score and all playing reserves. Applying Settings starts a new match. Clocks reset for each game; statistics continue to count individual games.</p>
     <p><strong>Clock and Undo.</strong> Time expiry loses. Undo restores position, clock and statistics and returns to a human decision against the computer.</p>
   </div></dialog>
 
