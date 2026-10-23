@@ -95,6 +95,7 @@
     const active = Array(64).fill(null), locked = Array(64).fill(null);
     const normal = EDGE_DEFS.flatMap(e => e.cells);
     shuffled([...Array(12).fill("black"), ...Array(12).fill("white")]).forEach((c,i) => active[normal[i]] = c);
+    shuffled(["black","black","white","white"]).forEach((c,slot)=>locked[CORNERS[slot]]=c);
     return { active, locked };
   }
 
@@ -112,11 +113,17 @@
 
   function freshState(starter = chooseStarter()) {
     const reserve = freshReserve();
+    const board=Array(36).fill(null);
+    // v13.0.4 opening anchors: equal colours on opposite diagonals.
+    [[0,"black"],[5,"white"],[30,"white"],[35,"black"]].forEach(([i,colour])=>{
+      board[i]={id:nextPieceId++,colour,pinned:true,special:true,anchor:true};
+    });
     return {
       phase: "main",
-      board: Array(36).fill(null),
+      board,
+      finalFourPhase:false,
       reserve,
-      openingReserve: reserve.locked.map(colour => colour),
+      openingReserve: Array(64).fill(null),
       selectedOpeningIndex: null,
       releasedCorners: [false,false,false,false],
       clearedEdges: [false,false,false,false],
@@ -188,13 +195,14 @@
     return state.reserve.active.map((colour,i) => colour && i !== exclude && !CORNERS.includes(i) ? i : null).filter(i => i !== null);
   }
   function activeReserveIndices(colour = null, exclude = null) {
+    if (state.finalFourPhase) return CORNERS.filter(i=>state.reserve.locked[i] && (!colour || state.reserve.locked[i]===colour));
     return ordinaryReserveIndices(exclude).filter(i => !colour || state.reserve.active[i] === colour);
   }
 
   function reserveCount(colour) { return activeReserveIndices(colour).length; }
   function reserveTotal() { return activeReserveIndices().length; }
   function reserveColourCount() { return ["black","white"].filter(c => reserveCount(c) > 0).length; }
-  function placementOnlyNow() { return false; }
+  function placementOnlyNow() { return state.finalFourPhase || (reserveTotal()>0 && reserveColourCount()===1 && !state.consequence && !state.redeployPiece); }
 
   function blockedAnchors() { return []; }
 
@@ -237,15 +245,17 @@
   }
 
   function consumeReserve(index) {
-    const colour = state.reserve.active[index];
-    if (!colour || CORNERS.includes(index)) return null;
+    const colour = CORNERS.includes(index) && state.finalFourPhase ? state.reserve.locked[index] : state.reserve.active[index];
+    if (!colour || (CORNERS.includes(index) && !state.finalFourPhase)) return null;
     const piece = { id: nextPieceId++, colour, pinned: CORNERS.includes(index), special: CORNERS.includes(index), anchor: false };
-    state.reserve.active[index] = null;
+    if (CORNERS.includes(index)) state.reserve.locked[index]=null;
+    else state.reserve.active[index]=null;
     updateEdgeReleases();
     return piece;
   }
 
   function availableChoiceColours() {
+    if (state.finalFourPhase) return ["black","white"].filter(c=>activeReserveIndices(c).length);
     if (state.phase === "opening") return ["black","white"].filter(c => state.openingRemaining[c] > 0);
     if (state.consequence?.type === "jump-choice") return [state.consequence.heldColour, state.consequence.jumpedPiece.colour];
     const exclude = state.consequence?.type === "move" ? state.consequence.heldIndex : null;
@@ -296,7 +306,13 @@
     state.consequence = null;
     state.redeployPiece = null;
     clearSelection();
-    if (reserveTotal() === 0) finishDraw();
+    if (reserveTotal() === 0) {
+      if (!state.finalFourPhase) {
+        state.finalFourPhase=true;
+        state.colourChooser=current; // Final Four are selected by the player placing them.
+      }
+      if (!CORNERS.some(i=>state.reserve.locked[i])) finishDraw();
+    }
     render(); processFlow();
   }
 
@@ -524,7 +540,7 @@
 
   function chooseExactReserve(displayIndex) {
     if (!state.choosingColour || state.winner !== null || isComputer(state.colourChooser)) return;
-    const colour = state.phase === "opening" ? state.openingReserve[displayIndex] : state.reserve.active[displayIndex];
+    const colour = state.finalFourPhase ? state.reserve.locked[displayIndex] : state.reserve.active[displayIndex];
     if (!colour) return;
     chooseColour(colour, displayIndex);
   }
@@ -822,6 +838,7 @@
       return `${playerName(state.currentPlayer)}: place the ${colourName(state.assignedColour)} Opening Four piece on any empty 6×6 corner.`;
     }
     if (state.consequence?.type === "jump-choice" && state.choosingColour) return `${playerName(state.currentPlayer)}: choose which piece you will place after the Jump.`;
+    if (state.choosingColour && state.finalFourPhase) return `${playerName(state.currentPlayer)}: choose a Final Four corner piece to place. No Move or Jump.`;
     if (state.choosingColour) return ordinaryReserveIndices(state.consequence?.heldIndex).length
       ? `${playerName(state.colourChooser)}: choose a reserve piece/colour for ${playerName(state.currentPlayer)}.`
       : "No ordinary reserve piece remains.";
@@ -849,9 +866,19 @@
         if (state.phase === "opening") btn.classList.add("reserve-cell--setup");
         const slot=CORNERS.indexOf(d), active=state.reserve.active[d], locked=state.reserve.locked[d];
         if (slot >= 0) {
-          renderCornerCounter(btn, slot);
-          boardEl.appendChild(btn);
-          continue;
+          const special=state.reserve.locked[d];
+          if(special){
+            const piece=renderPiece(special,true,!state.finalFourPhase);
+            btn.appendChild(piece);
+            const enabled=state.finalFourPhase && state.winner===null;
+            if(enabled && state.choosingColour && !isComputer(state.colourChooser)){
+              btn.classList.add("selectable");piece.classList.add("piece--available-reserve");
+              btn.addEventListener("click",()=>chooseExactReserve(d));
+            }
+            if(enabled && !state.choosingColour && state.selectedReserveIndex===d)piece.classList.add("piece--active-reserve");
+            btn.setAttribute("aria-label",`${colourName(special)} Final Four special${enabled?" available for placement":" held until endgame"}`);
+          } else btn.setAttribute("aria-label","Final Four corner used");
+          boardEl.appendChild(btn);continue;
         }
         const openingTop = state.phase === "opening" ? state.openingReserve[d] : null;
         if (openingTop) {
@@ -931,7 +958,7 @@
     el("quick-win-rule").innerHTML = settings.version === "extreme"
       ? "<strong>Win:</strong> four in a line, or a tight/spaced Square."
       : "<strong>Win:</strong> make four in a horizontal, vertical or diagonal line.";
-    el("phase-help").textContent = `${ordinaryReserveIndices().length} ordinary pieces remain · corner counters record game wins.`;
+    el("phase-help").textContent = state.finalFourPhase ? `Final Four · ${activeReserveIndices().length} corner pieces remain · Place only` : `${ordinaryReserveIndices().length} ordinary pieces remain · four pinned opening anchors`;
     const consequence = state.consequence;
     const compulsory = consequence
       ? (consequence.type === "move" ? (consequence.step === 1 ? 2 : 1)
@@ -981,7 +1008,7 @@
       : state.phase === "opening"
       ? "Two same-colour special pieces at each outside corner. The chosen top piece flashes; dots mark where it can be placed."
       : state.redeployPiece ? `Place the jumped ${colourName(state.redeployPiece.colour)} piece on a dotted square.`
-      : "The chosen reserve piece flashes until placed. Select a board piece to show its Move/Jump destinations; select it again to return to placement.";
+      : state.finalFourPhase ? "Final Four: choose a shaped corner piece and place it. No Move or Jump." : "The chosen reserve piece flashes until placed. Select a board piece to show its Move/Jump destinations; select it again to return to placement.";
 
     swapBox.hidden = !state.pendingSwap || isComputer(state.pendingSwap?.decider);
     jumpChoiceBox.hidden = !(state.consequence?.type === "jump-choice" && state.choosingColour && !isComputer(state.colourChooser));
@@ -1012,16 +1039,23 @@
     match.pendingCounter=null;
     if (redraw) { render(); maybeOfferUpdate(); }
   }
+  function takeCounterForMatch(winner,slot){
+    if(!match.ownerColours[winner]){
+      const colour=match.cornerColours[slot];
+      match.ownerColours[winner]=colour;
+      match.ownerColours[other(winner)]=colour==="black"?"white":"black";
+    }
+    match.takenCounters[slot]=winner;
+  }
   function recordMatchResult() {
     if (!match || state.winner === "draw") return;
     const winner=state.winner;
     match.scores[winner]++;
     if (match.scores[winner] >= (matchLength()+1)/2) match.winner=winner;
     const free=match.takenCounters.map((owner,i)=>owner===null&&(!match.ownerColours[winner]||match.cornerColours[i]===match.ownerColours[winner])?i:null).filter(i=>i!==null);
-    if (free.length) {
-      match.pendingCounter=winner;
-      if (isComputer(winner)) takeCounter(free[Math.floor(Math.random()*free.length)],false);
-    }
+    // v17: physical corner pieces are for play, so score markers are virtual.
+    // Record score without requiring the winner to remove a game piece.
+    if (free.length) takeCounterForMatch(winner,free[0]);
   }
   function nextMatchGame() {
     if (!match || state.winner === null || match.pendingCounter !== null || match.winner !== null) return;

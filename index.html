@@ -59,7 +59,7 @@
         <section class="board-section">
           <div class="board-frame">
             <div id="board" class="board" role="grid" aria-label="Lipfty eight by eight board with inner six by six playing area"></div>
-            <p class="board-note">Lipfty: inner 6×6 playing area, 24 ordinary reserve pieces. Four squarish corner counters record wins; the first winner chooses their counter colour.</p>
+            <p class="board-note">Lipfty: four pinned opening pieces, 24 ordinary reserves, then four outside Final Four pieces. Match wins are recorded in the score.</p>
           </div>
           <div id="swap-box" class="decision-box" hidden>
             <strong>Accept the first placement or take the position?</strong>
@@ -74,10 +74,10 @@
 
         <aside class="rules-panel rules-panel--quick">
           <h2 id="quick-rules-title">Lipfty · Easy</h2>
-          <p id="quick-opening-rule"><strong>Start:</strong> empty inner 6×6; 24 shared reserve pieces.</p>
+          <p id="quick-opening-rule"><strong>Start:</strong> four pinned opening pieces; 24 ordinary reserves; Final Four at the outer corners.</p>
           <p><strong>Your turn:</strong> use the reserve colour handed to you to <strong>Place</strong>, <strong>Move</strong> one adjacent square, or make one opposite-colour <strong>Jump</strong>.</p>
           <p id="quick-win-rule"><strong>Win:</strong> make four in a horizontal, vertical or diagonal line.</p>
-          <p><strong>Match:</strong> Single game, Best of 3 or Best of 5. Win a game, take a corner counter of your colour. First to the required wins takes the match; draws are replayed.</p>
+          <p><strong>Match:</strong> Single game, Best of 3 or Best of 5. Win a game to gain a match point. First to the required wins takes the match; draws are replayed.</p>
           <p class="panel-help"><strong>?</strong> opens the complete Lipfty rules.</p>
         </aside>
       </section>
@@ -159,15 +159,15 @@
 
   <dialog id="help-dialog"><div class="dialog-heading"><div><p class="dialog-eyebrow">How to play</p><h2>Lipfty</h2></div><button class="dialog-close" id="close-help" type="button" aria-label="Close">×</button></div><div class="rules-copy"><p><a href="Lipfty-Rules.pdf" target="_blank" rel="noopener">Printable rules (PDF)</a> · <a href="Lipfty-Rules.md" target="_blank" rel="noopener">Rules source (Markdown)</a></p>
     <p><strong>Objective.</strong> Complete four of one colour in a line; Standard also allows tight and spaced axis-aligned squares. Colours are shared.</p>
-    <p><strong>Setup.</strong> The inner 6×6 starts empty. Put 24 ordinary pieces on the outside edges, 12 of each colour. The four physical corners hold win counters only; they never enter play. No Opening Four.</p>
+    <p><strong>Setup.</strong> Four pinned pieces start on the inner 6×6 corners: matching colours on opposite diagonals. Put 24 ordinary pieces on the outside edges, 12 of each colour. Put four shaped Final Four pieces in the four physical outer corners, two of each colour. They enter play after the ordinary reserves are exhausted.</p>
     <p><strong>First placement.</strong> Keep the Accept / Take position choice. Click the first board piece to Take position or an available ordinary outside piece to Accept and select it.</p>
     <p><strong>Normal play.</strong> The opponent selects an ordinary reserve piece. Place it, Move an unpinned board piece of that colour one adjacent square, or Jump over one adjacent opposite-colour unpinned piece. Learning is Place only. When only one reserve colour is available, it is selected automatically; the player taking the turn still chooses their action.</p>
     <p><strong>Move consequence.</strong> The opponent chooses and places another ordinary reserve piece; the mover places the exact held piece. A Move requires another ordinary reserve besides the held piece. With only one reserve left, Place or an otherwise legal Jump is available.</p>
-    <p><strong>Jump consequence.</strong> The opponent chooses and places either the exact held piece or exact jumped piece; the jumper places the other. No corner counter is used in either placement.</p>
-    <p><strong>Matches and corner counters.</strong> Choose Single game, Best of 3 or Best of 5 (default) in Settings. First to 1, 2 or 3 wins takes the match. The corners keep their squarish pieces: two of each shared-piece colour. The first winner clicks any corner piece to take it and choose their counter colour; the opponent then collects the other colour. Subsequent winners take a remaining counter of their own colour. Taken counters disappear from the corners. The computer takes an eligible counter automatically. A third win ends Best of 5 without needing a third counter of that colour; at 2–2, the fifth game is the decider. Counter ownership never restricts ordinary shared-piece colours. Draws award no counter and replay the same numbered game. Starting players alternate after every game, including a draw; Accept/Take remains available.</p>
+    <p><strong>Jump consequence.</strong> The opponent chooses and places either the exact held piece or exact jumped piece; the jumper places the other. Final Four pieces are not used during compulsory placements.</p>
+    <p><strong>Endgame and matches.</strong> When only one ordinary reserve colour remains, normal turns become Place only. After all 24 ordinary pieces and compulsory placements are finished, players choose and place the four remaining outside Final Four pieces, one at a time. They are pinned once placed and can complete a winning pattern. If all four are used without a win, the game is a draw. Match length may be Single game, Best of 3 or Best of 5. Match points are recorded in the score panel, independent of the outside playing pieces. Draws earn no point; starters alternate between games.</p>
     <p><strong>Endgame.</strong> Move/Jump continues even with one ordinary reserve colour left. Finish compulsory placements. Draw when all ordinary reserves are used without a win, or a compulsory placement cannot be completed.</p>
     <p><strong>Wins and protection.</strong> Check after every placement, Move, Jump and redeployment; a win stops the sequence. The moving piece is protected during its consequence and the opponent’s following normal turn.</p>
-    <p><strong>Continuing.</strong> After taking a counter, click Next game; after a draw, click Replay game. New match resets the score and counters. Applying Settings starts a new match. Clocks reset for each game; statistics continue to count individual games.</p>
+    <p><strong>Continuing.</strong> After a win, click Next game; after a draw, click Replay game. New match resets the score and all playing reserves. Applying Settings starts a new match. Clocks reset for each game; statistics continue to count individual games.</p>
     <p><strong>Clock and Undo.</strong> Time expiry loses. Undo restores position, clock and statistics and returns to a human decision against the computer.</p>
   </div></dialog>
 
