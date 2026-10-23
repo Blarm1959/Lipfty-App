@@ -37,10 +37,6 @@
         <div class="turn-message-card"><p id="status">Starting Lipfty…</p></div>
       </section>
 
-      <section class="match-banner" aria-live="polite" aria-label="Match score">
-        <strong id="match-score"></strong><span id="match-progress"></span>
-      </section>
-
       <section class="game-stage">
         <aside class="reserve-panel">
           <h2 id="reserve-heading">Colour to use</h2>
@@ -74,7 +70,6 @@
           <p id="quick-opening-rule"><strong>Start:</strong> choose the first reserve colour for the opponent. They hold that colour’s corner piece and you hold the opposite colour. Both colours stay fixed after Accept/Take.</p>
           <p><strong>Your turn:</strong> use the handed colour to <strong>Place</strong>, <strong>Move</strong> or <strong>Jump</strong>. You cannot win until you have completed a Move or Jump.</p>
           <p id="quick-win-rule"><strong>Win:</strong> make four in a horizontal, vertical or diagonal line.</p>
-          <p><strong>Match:</strong> Single game, Best of 3 or Best of 5. Win a game to gain a match point. First to the required wins takes the match; draws are replayed.</p>
           <p class="panel-help"><strong>?</strong> opens the complete Lipfty rules.</p>
         </aside>
 
@@ -91,13 +86,11 @@
               <span class="qualification-copy"><strong id="qualification-name-1">Computer</strong><small id="qualification-status-1">First colour not yet chosen</small></span>
             </div>
           </div>
-          <p class="placement-alert" id="placement-alert" hidden></p>
-          <p class="panel-help" id="phase-help" hidden>Empty inner 6×6 start.</p>
         </section>
       </section>
 
       <section class="action-bar">
-        <div class="action-bar-left"><button class="button button--primary" id="next-game" type="button" hidden>Next game</button><button class="button button--secondary" id="new-game" type="button">New game</button></div>
+        <div class="action-bar-left"><button class="button button--secondary" id="new-game" type="button">New game</button></div>
         <div class="action-bar-centre"><button class="button button--secondary" id="undo" type="button">Undo</button></div>
         <div class="build-info"><span id="app-version">Version 16.0.4</span><span id="build-reference"></span></div>
       </section>
@@ -133,11 +126,7 @@
 
       <section class="wizard-step" data-wizard-step="2" hidden>
         <h3>Choose game version</h3>
-        <fieldset class="setup-fieldset"><legend>Match length</legend><div class="choice-grid">
-          <label><input name="matchLength" type="radio" value="1"><span>Single game</span></label>
-          <label><input name="matchLength" type="radio" value="3"><span>Best of 3</span></label>
-          <label><input checked name="matchLength" type="radio" value="5"><span>Best of 5</span></label>
-        </div><p class="setup-help">First to 1, 2 or 3 wins. Draws are replayed. Starting colour-choosers alternate within a match.</p></fieldset>
+        
         <fieldset class="setup-fieldset"><legend>Version</legend><div class="mode-choice-grid version-choice-grid">
           
           <label class="mode-choice"><input checked name="gameVersion" type="radio" value="standard"><span><strong>Easy</strong><small>Place, Move and Jump · line wins</small></span></label>
@@ -148,7 +137,7 @@
       <section class="wizard-step" data-wizard-step="3" hidden>
         <h3>Who is playing?</h3>
         <div class="setup-grid setup-grid--players"><label class="field-label"><span id="player1-label-text">Player name</span><input class="text-input" id="setting-player1" maxlength="24"></label><label class="field-label" id="player2-label"><span>Player 2 name</span><input class="text-input" id="setting-player2" maxlength="24"></label></div>
-        <fieldset class="setup-fieldset"><legend>Who chooses the first reserve colour?</legend><div class="choice-grid"><label><input checked name="starter" type="radio" value="random"><span>Random</span></label><label><input name="starter" type="radio" value="alternate"><span>Alternate matches</span></label><label><input name="starter" type="radio" value="player"><span id="starter-player-label">Player</span></label><label><input name="starter" type="radio" value="computer"><span id="starter-other-label">Computer</span></label></div></fieldset>
+        <fieldset class="setup-fieldset"><legend>Who chooses the first reserve colour?</legend><div class="choice-grid"><label><input checked name="starter" type="radio" value="random"><span>Random</span></label><label><input name="starter" type="radio" value="alternate"><span>Alternate games</span></label><label><input name="starter" type="radio" value="player"><span id="starter-player-label">Player</span></label><label><input name="starter" type="radio" value="computer"><span id="starter-other-label">Computer</span></label></div></fieldset>
       </section>
 
       <section class="wizard-step" data-wizard-step="4" hidden>
@@ -179,9 +168,8 @@
     <p><strong>Move consequence.</strong> The opponent chooses and places another ordinary reserve piece; the mover places the exact held piece. A Move requires another ordinary reserve besides the held piece. With only one reserve left, Place or an otherwise legal Jump is available.</p>
     <p><strong>Jump consequence.</strong> The opponent chooses and places either the exact held piece or exact jumped piece; the jumper places the other. Final Four pieces are not used during compulsory placements.</p>
     <p><strong>Deadline and Final Four.</strong> After compulsory placements are finished, if either ordinary reserve colour runs out and one player has not qualified, that player loses. If neither qualified, the initial ordinary placer loses. Otherwise Move/Jump ends at this one-colour cutoff, and the remaining ordinary pieces are Place-only. Once all ordinary pieces are used, the four outside specials enter the 6×6 one at a time, permanently pinned. If they are all used without a winner, the game is a draw.</p>
-    <p><strong>Matches.</strong> Single game, Best of 3 or Best of 5; scores are separate from the four physical playing specials. Draws replay the same game; starting colour-choosers alternate.</p>
     <p><strong>Wins and protection.</strong> A four-piece pattern wins only if the acting player has already completed a Move or Jump, including the action currently being performed. A win cancels all remaining compulsory placements. The moved/jumped piece is temporarily protected, as in v17.</p>
-    <p><strong>Continuing.</strong> After a win, click Next game; after a draw, click Replay game. New Game starts a fresh match, resetting the score and all playing reserves. Applying Settings starts a new match. Clocks reset for each game; statistics continue to count individual games.</p>
+    <p><strong>Continuing.</strong> New game starts a fresh game with the reserves and corners reset. Applying Settings also starts a new game. Clocks reset; individual-game statistics are retained.</p>
     <p><strong>Clock and Undo.</strong> Time expiry loses. Undo restores position, clock and statistics and returns to a human decision against the computer.</p>
   </div></dialog>
 
