@@ -137,6 +137,7 @@
       openingChooser: starter,
       firstPlacer: other(starter),
       heldCorners: [null,null],
+      qualificationCornerColours: [null,null],
       qualified: [false,false],
       cornerPickFor: null,
       cornerReturnFor: null,
@@ -170,6 +171,7 @@
       releasedCorners: [...s.releasedCorners], clearedEdges: [...s.clearedEdges],
       openingRemaining: {...s.openingRemaining},
       heldCorners: s.heldCorners.map(c => c ? {...c} : null),
+      qualificationCornerColours: [...s.qualificationCornerColours],
       qualified: [...s.qualified],
       deferredTurn: s.deferredTurn ? {...s.deferredTurn} : null,
       legalMoves: new Set(s.legalMoves), legalJumps: new Map(s.legalJumps),
@@ -255,6 +257,7 @@
     const held = state.heldCorners[player];
     if (!held || !CORNERS.includes(index) || state.reserve.locked[index]) return false;
     state.reserve.locked[index] = held.colour;
+    state.qualificationCornerColours[player] = held.colour;
     state.heldCorners[player] = null;
     return true;
   }
@@ -265,6 +268,7 @@
         !CORNERS.includes(index) || isComputer(player)) return;
     checkpoint();
     state.heldCorners[player] = { colour:state.reserve.locked[index], source:index };
+    state.qualificationCornerColours[player] = state.heldCorners[player].colour;
     state.reserve.locked[index] = null;
     state.cornerPickFor = null;
     state.currentPlayer = state.firstPlacer;
@@ -368,6 +372,7 @@
       const first = CORNERS.find(i=>state.reserve.locked[i]===colour);
       if (first === undefined) throw new Error("No opening corner matches selected colour");
       state.heldCorners[state.firstPlacer] = { colour, source:first };
+      state.qualificationCornerColours[state.firstPlacer] = colour;
       state.reserve.locked[first] = null;
       state.cornerPickFor = state.openingChooser;
     }
@@ -942,6 +947,7 @@
         if (i.length) {
           const player=state.cornerPickFor, chosen=i[Math.floor(Math.random()*i.length)];
           checkpoint();state.heldCorners[player]={colour:state.reserve.locked[chosen],source:chosen};
+          state.qualificationCornerColours[player]=state.heldCorners[player].colour;
           state.reserve.locked[chosen]=null;state.cornerPickFor=null;
           state.currentPlayer=state.firstPlacer;render();processFlow();
         }
@@ -1097,8 +1103,25 @@
     }
   }
 
+  function renderQualificationPanel() {
+    for (let player=0;player<2;player++) {
+      const held = state.heldCorners[player];
+      const colour = state.qualificationCornerColours[player] || held?.colour || null;
+      const returned = state.qualified[player] && !held;
+      const token = el(`qualification-piece-${player}`);
+      token.className = `piece piece--special qualification-token ${colour ? `piece--${colour}` : "qualification-token--unassigned"}${returned ? " qualification-token--returned" : ""}`;
+      el(`qualification-name-${player}`).textContent = playerName(player);
+      el(`qualification-status-${player}`).textContent = returned
+        ? `${colour ? colourName(colour) + " · " : ""}Returned — can win`
+        : state.qualified[player]
+          ? "Move/Jump completed — return piece"
+          : held ? `${colourName(held.colour)} · Move/Jump needed` : "Corner piece not yet chosen";
+    }
+  }
+
   function render() {
     applyColours();
+    renderQualificationPanel();
     currentEl.textContent = state.winner===null ? playerName(decisionActor()) : "Game over";
     statusEl.textContent = statusText() + (match?.pendingCounter !== null && match?.pendingCounter !== undefined ? ` ${playerName(match.pendingCounter)}: ${match.ownerColours[match.pendingCounter]?`take a ${colourName(match.ownerColours[match.pendingCounter])} corner counter`:"choose your counter colour by taking any corner piece"}.` : "") + (state.lastReleaseMessage ? ` ${state.lastReleaseMessage}.` : "");
     renderMatch();
