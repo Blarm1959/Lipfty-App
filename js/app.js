@@ -228,17 +228,27 @@
     };
   }
 
+  // A completed qualifying Move/Jump earns its corner return even when an
+  // opponent wins during its compulsory continuation. An immediate win ends
+  // the continuation, so resolve the earned return before showing Game over.
+  function settleEarnedCornerOnGameEnd() {
+    for (const player of [0,1]) {
+      if (!state.qualified[player] || !state.heldCorners[player]) continue;
+      if (state.pendingReturnPlayer !== player && state.cornerReturnFor !== player) continue;
+      const vacant = CORNERS.find(i => !state.reserve.locked[i]);
+      if (vacant === undefined || !putHeldCorner(player, vacant))
+        throw new Error("No outside corner available for earned return");
+    }
+    state.pendingReturnPlayer = null;
+    state.cornerReturnFor = null;
+    state.deferredTurn = null;
+  }
+
   function finishWin() {
     const w = R.checkWin(state.board, ruleOptions());
     // A four-piece pattern wins only after its maker has Move/Jump-qualified.
     if (!w || !state.qualified[state.currentPlayer]) return false;
-    // A winning Move/Jump cancels the compulsory continuation. Return its
-    // already-earned corner piece automatically before ending the game.
-    if (state.pendingReturnPlayer === state.currentPlayer) {
-      const vacant = CORNERS.find(i => !state.reserve.locked[i]);
-      if (vacant !== undefined) putHeldCorner(state.currentPlayer, vacant);
-      state.pendingReturnPlayer = null;
-    }
+    settleEarnedCornerOnGameEnd();
     state.winner = state.currentPlayer;
     state.winningCells = [...w.line];
     state.winType = w.type;
@@ -282,6 +292,7 @@
     if (!missing.length) return false;
     // If neither player qualified, the first ordinary placer loses.
     const loser = missing.length===2 ? state.firstPlacer : missing[0];
+    settleEarnedCornerOnGameEnd();
     state.winner = other(loser);
     state.winType = "qualification";
     state.choosingColour = false;
@@ -423,6 +434,7 @@
 
   function finishDraw() {
     if (state.winner !== null) return;
+    settleEarnedCornerOnGameEnd();
     state.winner = "draw";
     state.choosingColour = false;
     stopClock(); maybeRecordResult();
@@ -1217,6 +1229,7 @@
   function restoreClock(snap){ if(clockInterval) clearInterval(clockInterval); clockInterval=null; const initial=clockEnabled()?Number(settings.clockMinutes)*60000:0; clockRemainingMs=snap?.remainingMs?[...snap.remainingMs]:[initial,initial]; clockActivePlayer=Number.isInteger(snap?.activePlayer)?snap.activePlayer:null; clockLastTick=clockActivePlayer===null?null:Date.now(); }
   function finishTimeLoss(expired){
     if(!state || state.winner!==null) return;
+    settleEarnedCornerOnGameEnd();
     clockRemainingMs[expired]=0; state.winner=other(expired); state.winType="time"; state.choosingColour=false;
     if(clockInterval) clearInterval(clockInterval); clockInterval=null; clockActivePlayer=null; clockLastTick=null;
     maybeRecordResult(); playTone("win"); render(); maybeOfferUpdate();
