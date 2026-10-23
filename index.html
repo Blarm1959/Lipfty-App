@@ -59,7 +59,7 @@
         <section class="board-section">
           <div class="board-frame">
             <div id="board" class="board" role="grid" aria-label="Lipfty eight by eight board with inner six by six playing area"></div>
-            <p class="board-note">Lipfty: four pinned opening pieces, 24 ordinary reserves, then four outside Final Four pieces. Match wins are recorded in the score.</p>
+            <p class="board-note">Lipfty 18: return your held corner by completing a Move or Jump before you can win. Colours are shared; both players may move and jump again.</p>
           </div>
           <div id="swap-box" class="decision-box" hidden>
             <strong>Accept the first placement or take the position?</strong>
@@ -74,8 +74,8 @@
 
         <aside class="rules-panel rules-panel--quick">
           <h2 id="quick-rules-title">Lipfty · Easy</h2>
-          <p id="quick-opening-rule"><strong>Start:</strong> four pinned opening pieces; 24 ordinary reserves; Final Four at the outer corners.</p>
-          <p><strong>Your turn:</strong> use the reserve colour handed to you to <strong>Place</strong>, <strong>Move</strong> one adjacent square, or make one opposite-colour <strong>Jump</strong>.</p>
+          <p id="quick-opening-rule"><strong>Start:</strong> four pinned inner corners; each player takes one outer special. Return yours after your first Move or Jump.</p>
+          <p><strong>Your turn:</strong> use the handed colour to <strong>Place</strong>, <strong>Move</strong> or <strong>Jump</strong>. You cannot win until you have completed a Move or Jump.</p>
           <p id="quick-win-rule"><strong>Win:</strong> make four in a horizontal, vertical or diagonal line.</p>
           <p><strong>Match:</strong> Single game, Best of 3 or Best of 5. Win a game to gain a match point. First to the required wins takes the match; draws are replayed.</p>
           <p class="panel-help"><strong>?</strong> opens the complete Lipfty rules.</p>
@@ -123,9 +123,9 @@
           <label><input name="matchLength" type="radio" value="1"><span>Single game</span></label>
           <label><input name="matchLength" type="radio" value="3"><span>Best of 3</span></label>
           <label><input checked name="matchLength" type="radio" value="5"><span>Best of 5</span></label>
-        </div><p class="setup-help">First to 1, 2 or 3 wins. Draws are replayed. Starting players alternate within a match.</p></fieldset>
+        </div><p class="setup-help">First to 1, 2 or 3 wins. Draws are replayed. Starting colour-choosers alternate within a match.</p></fieldset>
         <fieldset class="setup-fieldset"><legend>Version</legend><div class="mode-choice-grid version-choice-grid">
-          <label class="mode-choice"><input name="gameVersion" type="radio" value="learning"><span><strong>Learning</strong><small>Placement only · line wins</small></span></label>
+          
           <label class="mode-choice"><input checked name="gameVersion" type="radio" value="standard"><span><strong>Easy</strong><small>Place, Move and Jump · line wins</small></span></label>
           <label class="mode-choice"><input name="gameVersion" type="radio" value="extreme"><span><strong>Standard</strong><small>Easy plus tight and spaced Square wins</small></span></label>
         </div></fieldset>
@@ -134,7 +134,7 @@
       <section class="wizard-step" data-wizard-step="3" hidden>
         <h3>Who is playing?</h3>
         <div class="setup-grid setup-grid--players"><label class="field-label"><span id="player1-label-text">Player name</span><input class="text-input" id="setting-player1" maxlength="24"></label><label class="field-label" id="player2-label"><span>Player 2 name</span><input class="text-input" id="setting-player2" maxlength="24"></label></div>
-        <fieldset class="setup-fieldset"><legend>Who starts the match?</legend><div class="choice-grid"><label><input checked name="starter" type="radio" value="random"><span>Random</span></label><label><input name="starter" type="radio" value="alternate"><span>Alternate matches</span></label><label><input name="starter" type="radio" value="player"><span id="starter-player-label">Player</span></label><label><input name="starter" type="radio" value="computer"><span id="starter-other-label">Computer</span></label></div></fieldset>
+        <fieldset class="setup-fieldset"><legend>Who chooses the first reserve colour?</legend><div class="choice-grid"><label><input checked name="starter" type="radio" value="random"><span>Random</span></label><label><input name="starter" type="radio" value="alternate"><span>Alternate matches</span></label><label><input name="starter" type="radio" value="player"><span id="starter-player-label">Player</span></label><label><input name="starter" type="radio" value="computer"><span id="starter-other-label">Computer</span></label></div></fieldset>
       </section>
 
       <section class="wizard-step" data-wizard-step="4" hidden>
@@ -158,15 +158,15 @@
   <dialog id="statistics-dialog"><div class="dialog-heading"><div><p class="dialog-eyebrow">Lipfty</p><h2>Statistics</h2></div><button class="dialog-close" id="close-statistics" type="button">×</button></div><div id="statistics-content" class="statistics-content"></div><div class="dialog-actions"><button class="button button--secondary" id="reset-statistics" type="button">Reset statistics</button></div></dialog>
 
   <dialog id="help-dialog"><div class="dialog-heading"><div><p class="dialog-eyebrow">How to play</p><h2>Lipfty</h2></div><button class="dialog-close" id="close-help" type="button" aria-label="Close">×</button></div><div class="rules-copy"><p><a href="Lipfty-Rules.pdf" target="_blank" rel="noopener">Printable rules (PDF)</a> · <a href="Lipfty-Rules.md" target="_blank" rel="noopener">Rules source (Markdown)</a></p>
-    <p><strong>Objective.</strong> Complete four of one colour in a line; Standard also allows tight and spaced axis-aligned squares. Colours are shared.</p>
-    <p><strong>Setup.</strong> Four pinned pieces start on the inner 6×6 corners: matching colours on opposite diagonals. Put 24 ordinary pieces on the outside edges, 12 of each colour. Put four shaped Final Four pieces in the four physical outer corners, two of each colour. They enter play after the ordinary reserves are exhausted.</p>
-    <p><strong>First placement.</strong> Keep the Accept / Take position choice. Click the first board piece to Take position or an available ordinary outside piece to Accept and select it.</p>
-    <p><strong>Normal play.</strong> The opponent selects an ordinary reserve piece. Place it, Move an unpinned board piece of that colour one adjacent square, or Jump over one adjacent opposite-colour unpinned piece. Learning is Place only. When only one reserve colour is available, it is selected automatically; the player taking the turn still chooses their action.</p>
+    <p><strong>Objective.</strong> After you have completed at least one Move or Jump, make four of either shared colour in a line; Standard also allows tight or spaced axis-aligned squares. Your opponent need not have qualified.</p>
+    <p><strong>Setup.</strong> Four pinned pieces start on the inner 6×6 corners, with matching colours diagonally opposite. Place 24 ordinary reserves (12 of each colour) and four shaped specials (two per colour) on the outside. The chosen starter hands the opponent an ordinary reserve colour. That opponent takes a matching-colour outside special. The starter takes a special of either remaining colour. Each holds their own special until their first Move or Jump.</p>
+    <p><strong>First placement.</strong> After both specials have been taken, the recipient of the opening colour places the ordinary piece. Their opponent then chooses Accept or Take position. The piece stays where placed. Subsequent colours remain opponent-selected.</p>
+    <p><strong>Normal play.</strong> The opponent selects an ordinary reserve piece. Place it, Move an unpinned board piece of that colour one adjacent square or Jump over one adjacent opposite-colour unpinned piece. Your first successful Move/Jump qualifies you to win. After its compulsory placements, return your held special to any empty outside corner. You may Move and Jump again freely. A winning Move/Jump ends the game immediately and automatically returns your earned special.</p>
     <p><strong>Move consequence.</strong> The opponent chooses and places another ordinary reserve piece; the mover places the exact held piece. A Move requires another ordinary reserve besides the held piece. With only one reserve left, Place or an otherwise legal Jump is available.</p>
     <p><strong>Jump consequence.</strong> The opponent chooses and places either the exact held piece or exact jumped piece; the jumper places the other. Final Four pieces are not used during compulsory placements.</p>
-    <p><strong>Endgame and matches.</strong> When only one ordinary reserve colour remains, normal turns become Place only. After all 24 ordinary pieces and compulsory placements are finished, players choose and place the four remaining outside Final Four pieces, one at a time. They are pinned once placed and can complete a winning pattern. If all four are used without a win, the game is a draw. Match length may be Single game, Best of 3 or Best of 5. Match points are recorded in the score panel, independent of the outside playing pieces. Draws earn no point; starters alternate between games.</p>
-    <p><strong>Endgame.</strong> Move/Jump continues even with one ordinary reserve colour left. Finish compulsory placements. Draw when all ordinary reserves are used without a win, or a compulsory placement cannot be completed.</p>
-    <p><strong>Wins and protection.</strong> Check after every placement, Move, Jump and redeployment; a win stops the sequence. The moving piece is protected during its consequence and the opponent’s following normal turn.</p>
+    <p><strong>Deadline and Final Four.</strong> After compulsory placements are finished, if either ordinary reserve colour runs out and one player has not qualified, that player loses. If neither qualified, the initial ordinary placer loses. Otherwise Move/Jump ends at this one-colour cutoff, and the remaining ordinary pieces are Place-only. Once all ordinary pieces are used, the four outside specials enter the 6×6 one at a time, permanently pinned. If they are all used without a winner, the game is a draw.</p>
+    <p><strong>Matches.</strong> Single game, Best of 3 or Best of 5; scores are separate from the four physical playing specials. Draws replay the same game; starting colour-choosers alternate.</p>
+    <p><strong>Wins and protection.</strong> A four-piece pattern wins only if the acting player has already completed a Move or Jump, including the action currently being performed. A win cancels all remaining compulsory placements. The moved/jumped piece is temporarily protected, as in v17.</p>
     <p><strong>Continuing.</strong> After a win, click Next game; after a draw, click Replay game. New match resets the score and all playing reserves. Applying Settings starts a new match. Clocks reset for each game; statistics continue to count individual games.</p>
     <p><strong>Clock and Undo.</strong> Time expiry loses. Undo restores position, clock and statistics and returns to a human decision against the computer.</p>
   </div></dialog>
