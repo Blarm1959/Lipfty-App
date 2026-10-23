@@ -1090,16 +1090,17 @@
     for (let player=0;player<2;player++) {
       const held = state.heldCorners[player];
       const colour = state.qualificationCornerColours[player] || held?.colour || null;
-      const returned = state.qualified[player] && !held;
+      const completed = !!state.qualified[player];
+      const returned = completed && !held;
       const token = el(`qualification-piece-${player}`);
-      token.className = `piece piece--special qualification-token ${colour ? `piece--${colour}` : "qualification-token--unassigned"}${returned ? " qualification-token--returned" : ""}`;
+      token.className = `piece piece--special qualification-token ${colour ? `piece--${colour}` : "qualification-token--unassigned"}${completed ? " qualification-token--returned" : ""}`;
       el(`qualification-name-${player}`).textContent = playerName(player);
       el(`qualification-status-${player}`).textContent = returned
         ? `${colour ? colourName(colour) + " · " : ""}Returned — can win`
-        : state.qualified[player]
+        : completed
           ? state.pendingReturnPlayer === player && state.consequence
-            ? "Move/Jump completed — finish compulsory placements, then corner returns"
-            : "Move/Jump completed — return piece"
+            ? "Move/Jump done — qualified; corner returns after compulsory placements"
+            : "Move/Jump done — qualified; return the corner piece"
           : held ? `${colourName(held.colour)} · Move/Jump needed` : "First colour not yet chosen";
     }
   }
@@ -1130,7 +1131,6 @@
     const showPlacementAlert = compulsory > 0 && state.winner === null;
     el("placement-alert").hidden = !showPlacementAlert;
     el("placement-alert").textContent = `COMPULSORY PLACEMENT · ${compulsory} remaining`;
-    el("stage-info-card").hidden = !showPlacementAlert;
 
     blackBtn.querySelector("strong").textContent=colourName("black");
     whiteBtn.querySelector("strong").textContent=colourName("white");
