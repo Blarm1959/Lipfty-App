@@ -26,6 +26,32 @@
   const undoBtn = el("undo");
   const swapBox = el("swap-box");
   const jumpChoiceBox = el("jump-choice-box");
+  const openingDecisionDialog = el("opening-decision-dialog");
+  let openingDecisionPending = false;
+
+  function clearOpeningDecisionNotice() {
+    openingDecisionPending = false;
+    if (openingDecisionDialog.open) openingDecisionDialog.close();
+  }
+
+  function dismissOpeningDecision() {
+    if (!openingDecisionPending) return;
+    clearOpeningDecisionNotice();
+    processFlow();
+  }
+
+  function showComputerOpeningDecision(takePosition) {
+    el("opening-decision-title").textContent = takePosition
+      ? "Computer chose Take position"
+      : "Computer chose Accept";
+    el("opening-decision-description").textContent = takePosition
+      ? "The first piece stays where you placed it. You play again, after the computer chooses the colour for your next move."
+      : "The first piece stays where you placed it. You now choose a reserve colour for the computer's next move.";
+    openingDecisionPending = true;
+    // Do not run the computer or charge either player for reading this message.
+    stopClock();
+    openingDecisionDialog.showModal();
+  }
 
   let nextPieceId = 1;
   let state;
@@ -193,6 +219,7 @@
   }
   function undo() {
     if (!canUndo()) return;
+    clearOpeningDecisionNotice();
     clearTimeout(timer);
     rollbackResult();
     let snap;
@@ -499,7 +526,9 @@
     state.choosingColour = exactIndex === null;
     state.selectedReserveIndex = exactIndex;
     state.assignedColour = exactIndex === null ? null : state.reserve.active[exactIndex];
-    render(); processFlow();
+    render();
+    if (isComputer(decider)) showComputerOpeningDecision(swap);
+    processFlow();
   }
 
   function placePiece(index) {
@@ -937,6 +966,8 @@
 
   function processFlow() {
     clearTimeout(timer);
+    // Wait for the player to acknowledge the computer's opening decision.
+    if (openingDecisionPending) return;
     // Resolve forced colour handovers before assigning the decision clock.
     // No checkpoint: Undo should return to a meaningful player decision.
     const automatic = autoChooseOnlyColour();
@@ -1199,6 +1230,7 @@
   }
 
   function startGame() {
+    clearOpeningDecisionNotice();
     clearTimeout(timer); resultRecorded=false; recordedResult=null; nextPieceId=1; history=[]; state=freshState();
     applyColours(); initialiseClock(); render(); processFlow();
   }
@@ -1271,6 +1303,7 @@
   function renderStatistics(){const stats=loadStats(),box=el("statistics-content"),tile=(v,l)=>`<span><strong>${v}</strong><small>${l}</small></span>`;box.innerHTML=`<h3>Against the computer</h3><div class="statistics-summary">${tile(stats.computer.played,"Played")}${tile(stats.computer.won,"You won")}${tile(stats.computer.lost,"Computer won")}${tile(stats.computer.drawn,"Draws")}</div><h3>Two players</h3><div class="statistics-summary">${tile(stats.two.played,"Played")}${tile(stats.two.p1,"Player 1 won")}${tile(stats.two.p2,"Player 2 won")}${tile(stats.two.drawn,"Draws")}</div>`;}
 
   function jumpToEndTest(){
+    clearOpeningDecisionNotice();
     clearTimeout(timer); resultRecorded=false; recordedResult=null; nextPieceId=1; history=[]; state=freshState();
     state.phase="main"; state.openingPlaced=4; state.openingRemaining={black:0,white:0}; state.swapDone=true;
     state.board=Array(36).fill(null);
@@ -1288,6 +1321,11 @@
   el("choose-handed").addEventListener("click",()=>applyJumpChoice(state.consequence.heldColour));
   el("choose-jumped").addEventListener("click",()=>applyJumpChoice(state.consequence.jumpedPiece.colour));
   el("new-game").addEventListener("click",startGame);
+  el("opening-decision-ok").addEventListener("click", dismissOpeningDecision);
+  openingDecisionDialog.addEventListener("cancel", event => {
+    event.preventDefault();
+    dismissOpeningDecision();
+  });
   undoBtn.addEventListener("click",undo);
 
   let versionTaps=[]; function handleVersionTap(){const now=Date.now();versionTaps=versionTaps.filter(t=>now-t<=3000);versionTaps.push(now);if(versionTaps.length>=5){versionTaps=[];jumpToEndTest();}}
