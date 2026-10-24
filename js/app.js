@@ -222,7 +222,7 @@
   function ruleOptions() {
     return {
       allowDiagonal: true,
-      allowSquare: settings.version === "extreme",
+      allowSquare: settings.version === "medium" || settings.version === "extreme",
       allowSpacedSquare: settings.version === "extreme",
       inactiveWinCells: blockedAnchors()
     };
@@ -1127,11 +1127,13 @@
     statusEl.textContent = statusText() + (state.lastReleaseMessage ? ` ${state.lastReleaseMessage}.` : "");
     state.lastReleaseMessage = "";
 
-    const versionTitle = settings.version === "learning" ? "Learning" : settings.version === "extreme" ? "Standard" : "Easy";
+    const versionTitle = settings.version === "extreme" ? "Standard" : settings.version === "medium" ? "Medium" : "Easy";
     el("quick-rules-title").textContent = `Lipfty · ${versionTitle}`;
     el("quick-win-rule").innerHTML = settings.version === "extreme"
-      ? "<strong>Win:</strong> Move/Jump first, then four in a line or Square."
-      : "<strong>Win:</strong> Move/Jump first, then four in a line.";
+      ? "<strong>Win:</strong> Move/Jump first, then four in a line, tight square or spaced square."
+      : settings.version === "medium"
+        ? "<strong>Win:</strong> Move/Jump first, then four in a line or tight square (no spaced squares)."
+        : "<strong>Win:</strong> Move/Jump first, then four in a line.";
     blackBtn.querySelector("strong").textContent=colourName("black");
     whiteBtn.querySelector("strong").textContent=colourName("white");
     const excludeHeld = state.consequence?.type === "move" ? state.consequence.heldIndex : null;
@@ -1301,7 +1303,7 @@
   function syncDifficulty(){const n=Number(el("difficulty-input").value),names=["","Beginner","Standard","Expert"];el("difficulty-name").textContent=`${n} · ${names[n]}`;}
   function syncClockOptions(){const enabled=Number(fv("clockMinutes")||0)>0;el("clock-increment-field").disabled=!enabled;if(!enabled)sr("clockIncrement","0");}
   function showStep(n){wizardStep=Math.max(0,Math.min(5,n));wizardSteps.forEach((x,i)=>x.hidden=i!==wizardStep);wizardIndicators.forEach((x,i)=>{x.classList.toggle("wizard-progress-step--active",i===wizardStep);x.classList.toggle("wizard-progress-step--complete",i<wizardStep);});wizardDefault.hidden=wizardStep!==0;wizardBack.hidden=wizardStep===0;wizardNext.hidden=wizardStep===5;wizardSave.hidden=false;if(wizardStep===5)summary();}
-  function summary(){const one=fv("gameMode")==="computer",mins=Number(fv("clockMinutes")||0),inc=Number(fv("clockIncrement")||0),clock=mins?`${mins} min each${inc?` + ${inc}s`:""}`:"Clock off";el("setup-summary").textContent=`Lipfty · ${one?"Player vs Computer":"Two players"} · ${COLOURS[fv("colour1")][0]} / ${COLOURS[fv("colour2")][0]} · ${({learning:"Learning",standard:"Easy",extreme:"Standard"})[fv("gameVersion")||"standard"]} · ${clock}`;}
+  function summary(){const one=fv("gameMode")==="computer",mins=Number(fv("clockMinutes")||0),inc=Number(fv("clockIncrement")||0),clock=mins?`${mins} min each${inc?` + ${inc}s`:""}`:"Clock off";el("setup-summary").textContent=`Lipfty · ${one?"Player vs Computer":"Two players"} · ${COLOURS[fv("colour1")][0]} / ${COLOURS[fv("colour2")][0]} · ${({standard:"Easy",medium:"Medium",extreme:"Standard"})[fv("gameVersion")||"standard"]} · ${clock}`;}
   function loadForm(){sr("gameMode",settings.mode);el("difficulty-input").value=settings.level==="beginner"?1:settings.level==="expert"?3:2;sr("allowUndo",settings.undo?"yes":"no");sr("colour1",settings.colour1);sr("colour2",settings.colour2);sr("gameVersion",settings.version);el("setting-player1").value=settings.player1||"Player";el("setting-player2").value=settings.player2||"Player 2";sr("starter",settings.starter);sr("clockMinutes",String(settings.clockMinutes||0));sr("clockIncrement",String(settings.clockIncrement||0));el("setting-sound").checked=settings.sound!==false;el("setting-animations").checked=settings.animations!==false;el("setting-language").value=settings.language||"en-GB";syncMode();syncDifficulty();syncClockOptions();showStep(0);}
   function setDefaultForm(){
     const d=defaultSettings();
