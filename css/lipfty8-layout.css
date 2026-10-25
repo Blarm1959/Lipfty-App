@@ -373,3 +373,45 @@
  .qualification-panel{grid-column:1;grid-row:2}
 }
 @media(max-width:900px){.game-layout{grid-template-rows:auto auto auto}}
+
+/* v18.0.13: keep opening Accept / Take controls alongside the right-hand rules,
+   never below the board. The Move/Jump card occupies the left column. */
+.game-stage > #swap-box[hidden]{display:none!important}
+.game-stage > #swap-box{
+  width:100%;max-width:none;min-width:0;box-sizing:border-box;
+  padding:14px;border:1px solid #bfd0e0;border-radius:14px;
+  background:#edf5fc;box-shadow:0 12px 34px rgba(29,56,84,.08);
+}
+.game-stage > #swap-box strong{display:block;margin-bottom:6px;color:#163f71;line-height:1.3}
+.game-stage > #swap-box p{margin:0 0 11px;line-height:1.35}
+.game-stage > #swap-box > div{display:flex;gap:8px;flex-wrap:wrap;margin:0}
+.game-stage > #swap-box .button{flex:1 1 130px;white-space:normal}
+@media(min-width:1121px){
+  .game-stage{grid-template-rows:auto auto minmax(0,1fr)}
+  .reserve-panel{grid-column:1;grid-row:1}
+  .qualification-panel{grid-column:1;grid-row:2;align-self:start;min-width:0}
+  .board-section{grid-column:2;grid-row:1/span 3}
+  .rules-panel{grid-column:3;grid-row:1}
+  .game-stage > #swap-box{grid-column:3;grid-row:2;align-self:start}
+}
+@media(min-width:901px) and (max-width:1120px){
+  .game-stage{grid-template-rows:auto auto minmax(0,1fr)}
+  .reserve-panel{grid-column:1;grid-row:1}
+  .game-stage > #swap-box{grid-column:1;grid-row:2;align-self:start;padding:9px}
+  .qualification-panel{grid-column:1;grid-row:3;align-self:start;min-width:0;padding:9px}
+  .board-section{grid-column:2;grid-row:1/span 3}
+  .game-stage > #swap-box .button{flex-basis:100px}
+}
+@media(min-width:561px) and (max-width:900px){
+  .game-stage > #swap-box{order:1}
+  .board-section{order:2}
+  .reserve-panel{order:3}
+  .qualification-panel{order:4}
+  .rules-panel{order:5}
+}
+@media(max-width:560px){
+  .game-stage > #swap-box{order:0;grid-column:1/-1!important;padding:9px}
+  .game-stage > #swap-box strong{font-size:.86rem}
+  .game-stage > #swap-box p{font-size:.76rem}
+  .game-stage > #swap-box .button{flex-basis:110px}
+}

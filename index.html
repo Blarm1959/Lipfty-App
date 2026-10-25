@@ -47,32 +47,6 @@
           <p id="reserve-info" class="reserve-info"></p>
         </aside>
 
-
-
-        <section class="board-section">
-          <div class="board-frame">
-            <div id="board" class="board" role="grid" aria-label="Lipfty eight by eight board with inner six by six playing area"></div>
-            <p class="board-note">Lipfty 18: return your held corner by completing a Move or Jump before you can win. Colours are shared; both players may move and jump again.</p>
-          </div>
-          <div id="swap-box" class="decision-box" hidden>
-            <strong>Accept the first placement or take the position?</strong>
-            <p>Click the flashing board piece to Take position, or an available outside piece to Accept and select it to play next. The first ordinary piece stays where it was placed.</p>
-            <div><button id="carry-on" class="button button--secondary" type="button">Accept</button><button id="swap-sides" class="button button--primary" type="button">Take position</button></div>
-          </div>
-          <div id="jump-choice-box" class="decision-box" hidden>
-            <strong>After the Jump, choose which piece you will place.</strong>
-            <div><button id="choose-handed" class="button button--secondary" type="button"></button><button id="choose-jumped" class="button button--primary" type="button"></button></div>
-          </div>
-        </section>
-
-        <aside class="rules-panel rules-panel--quick">
-          <h2 id="quick-rules-title">Lipfty · Easy</h2>
-          <p id="quick-opening-rule"><strong>Start:</strong> the inner 6×6 is empty. Choose the first reserve colour for the opponent. They hold that colour’s outside corner piece; you hold the opposite colour. Both remain fixed after Accept/Take.</p>
-          <p><strong>Your turn:</strong> use the handed colour to <strong>Place</strong>, <strong>Move</strong> or <strong>Jump</strong>. You cannot win until you have completed a Move or Jump.</p>
-          <p id="quick-win-rule"><strong>Win:</strong> make four in a horizontal, vertical or diagonal line.</p>
-          <p class="panel-help"><strong>?</strong> opens the complete Lipfty rules.</p>
-        </aside>
-
         <section class="qualification-panel" aria-label="Move or Jump requirement" aria-live="polite">
           <h2>Move / Jump requirement</h2>
           <p class="qualification-help">Your first Move or Jump qualifies you to win. Your corner returns after its compulsory placements.</p>
@@ -87,6 +61,36 @@
             </div>
           </div>
         </section>
+
+
+
+        <section class="board-section">
+          <div class="board-frame">
+            <div id="board" class="board" role="grid" aria-label="Lipfty eight by eight board with inner six by six playing area"></div>
+            <p class="board-note">Lipfty 18: return your held corner by completing a Move or Jump before you can win. Colours are shared; both players may move and jump again.</p>
+          </div>
+
+        </section>
+
+        <aside class="rules-panel rules-panel--quick">
+          <h2 id="quick-rules-title">Lipfty · Easy</h2>
+          <p id="quick-opening-rule"><strong>Start:</strong> the inner 6×6 is empty. Choose the first reserve colour for the opponent. They hold that colour’s outside corner piece; you hold the opposite colour. Both remain fixed after Accept/Take.</p>
+          <p><strong>Your turn:</strong> use the handed colour to <strong>Place</strong>, <strong>Move</strong> or <strong>Jump</strong>. You cannot win until you have completed a Move or Jump.</p>
+          <p id="quick-win-rule"><strong>Win:</strong> make four in a horizontal, vertical or diagonal line.</p>
+          <p class="panel-help"><strong>?</strong> opens the complete Lipfty rules.</p>
+        </aside>
+
+          <div id="swap-box" class="decision-box opening-position-panel" hidden>
+            <strong>Accept the first placement or take the position?</strong>
+            <p>The first piece stays on the board. Accept to take your normal turn, or Take position to make the first player continue. Your special corner colour does not change.</p>
+            <div><button id="carry-on" class="button button--secondary" type="button">Accept</button><button id="swap-sides" class="button button--primary" type="button">Take position</button></div>
+          </div>
+          <div id="jump-choice-box" class="decision-box" hidden>
+            <strong>After the Jump, choose which piece you will place.</strong>
+            <div><button id="choose-handed" class="button button--secondary" type="button"></button><button id="choose-jumped" class="button button--primary" type="button"></button></div>
+          </div>
+
+
       </section>
 
       <section class="action-bar">
