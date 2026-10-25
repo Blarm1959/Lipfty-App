@@ -162,9 +162,7 @@
       heldCorners: [null,null],
       qualificationCornerColours: [null,null],
       qualified: [false,false],
-      cornerReturnFor: null,
       pendingReturnPlayer: null,
-      deferredTurn: null,
       choosingColour: true,
       assignedColour: null,
       selectedReserveIndex: null,
@@ -195,7 +193,6 @@
       heldCorners: s.heldCorners.map(c => c ? {...c} : null),
       qualificationCornerColours: [...s.qualificationCornerColours],
       qualified: [...s.qualified],
-      deferredTurn: s.deferredTurn ? {...s.deferredTurn} : null,
       legalMoves: new Set(s.legalMoves), legalJumps: new Map(s.legalJumps),
       consequence: s.consequence ? {...s.consequence, jumpedPiece: s.consequence.jumpedPiece ? {...s.consequence.jumpedPiece} : null} : null,
       redeployPiece: s.redeployPiece ? {...s.redeployPiece} : null,
@@ -210,7 +207,7 @@
     if (history.length > 60) history.shift();
   }
   function undoActor(s) {
-    return s.pendingSwap ? s.pendingSwap.decider : s.cornerReturnFor!==null ? s.cornerReturnFor : s.choosingColour ? s.colourChooser : s.currentPlayer;
+    return s.pendingSwap ? s.pendingSwap.decider : s.choosingColour ? s.colourChooser : s.currentPlayer;
   }
   function canUndo() {
     return settings.undo && history.some(snap => !isComputer(undoActor(snap.state)));
@@ -259,14 +256,11 @@
   function settleEarnedCornerOnGameEnd() {
     for (const player of [0,1]) {
       if (!state.qualified[player] || !state.heldCorners[player]) continue;
-      if (state.pendingReturnPlayer !== player && state.cornerReturnFor !== player) continue;
-      const origin = state.heldCorners[player].source;
-      if (!putHeldCorner(player, origin))
-        throw new Error("Original outside corner not available for earned return");
+      if (state.pendingReturnPlayer !== player) continue;
+      if (!putHeldCorner(player, firstEmptyCorner()))
+        throw new Error("No vacant outside corner for earned return");
     }
     state.pendingReturnPlayer = null;
-    state.cornerReturnFor = null;
-    state.deferredTurn = null;
   }
 
   function finishWin() {
@@ -285,31 +279,17 @@
     return true;
   }
 
+  function firstEmptyCorner() {
+    return CORNERS.find(index => !state.reserve.locked[index]);
+  }
+
   function putHeldCorner(player, index) {
     const held = state.heldCorners[player];
-    if (!held || index !== held.source || !CORNERS.includes(index) || state.reserve.locked[index]) return false;
+    if (!held || !CORNERS.includes(index) || state.reserve.locked[index]) return false;
     state.reserve.locked[index] = held.colour;
     state.qualificationCornerColours[player] = held.colour;
     state.heldCorners[player] = null;
     return true;
-  }
-
-  function returnCorner(index) {
-    const player = state.cornerReturnFor;
-    if (player === null || isComputer(player) || !CORNERS.includes(index) ||
-        state.reserve.locked[index] || state.winner !== null) return;
-    checkpoint();
-    finishCornerReturn(index);
-  }
-
-  function finishCornerReturn(index) {
-    const player = state.cornerReturnFor;
-    if (player === null || !putHeldCorner(player,index)) return;
-    state.cornerReturnFor = null;
-    const next = state.deferredTurn;
-    state.deferredTurn = null;
-    if (!next) throw new Error("Missing deferred turn after corner return");
-    nextNormalTurn(next.current,next.chooser,next.protectedId);
   }
 
   function finishQualificationForfeit() {
@@ -322,7 +302,6 @@
     state.winType = "qualification";
     state.choosingColour = false;
     state.pendingReturnPlayer = null;
-    state.cornerReturnFor = null;
     state.consequence = null;
     state.redeployPiece = null;
     clearSelection();
@@ -410,28 +389,14 @@
   }
 
   function nextNormalTurn(current, chooser, protectedId = null) {
-    // A newly earned corner is returned after *both* compulsory placements.
+    // Both human and computer return the held special automatically after
+    // the Move/Jump's two compulsory placements. The first vacant corner is
+    // deterministic, needs no further UI decision and preserves the four pieces.
     if (state.pendingReturnPlayer !== null) {
       const player = state.pendingReturnPlayer;
-      // Computer returns to the *original* outside corner.
-      if (isComputer(player)) {
-        if (!putHeldCorner(player, state.heldCorners[player].source))
-          throw new Error("Computer's original outside corner was unavailable");
-        state.pendingReturnPlayer = null;
-      } else {
-        state.deferredTurn = {current,chooser,protectedId};
-        state.cornerReturnFor = player;
-        state.pendingReturnPlayer = null;
-        state.currentPlayer = state.cornerReturnFor;
-        state.choosingColour = false;
-        state.assignedColour = null;
-        state.selectedReserveIndex = null;
-        state.consequence = null;
-        state.redeployPiece = null;
-        clearSelection();
-        render(); processFlow();
-        return;
-      }
+      if (!putHeldCorner(player, firstEmptyCorner()))
+        throw new Error("No vacant outside corner for qualification return");
+      state.pendingReturnPlayer = null;
     }
     // Under v18 the first colour exhausted is the qualification deadline.
     if (ordinaryReserveIndices().length < 24 &&
@@ -530,8 +495,7 @@
   }
 
   function placePiece(index) {
-    if (state.winner !== null || state.choosingColour || state.board[index] ||
-        state.cornerReturnFor !== null) return;
+    if (state.winner !== null || state.choosingColour || state.board[index]) return;
     checkpoint();
     state.positionDecisionMessage = "";
 
@@ -603,7 +567,6 @@
 
   function canMoveOrJump() {
     return settings.version !== "learning" && !state.consequence && !state.redeployPiece &&
-      state.cornerReturnFor === null &&
       !CORNERS.includes(state.selectedReserveIndex) && !placementOnlyNow();
   }
 
@@ -680,7 +643,7 @@
 
   function handleInner(index) {
     if (state.pendingSwap || state.winner !== null ||
-        state.cornerReturnFor !== null || isComputer(state.currentPlayer)) return;
+        isComputer(state.currentPlayer)) return;
     if (state.phase === "opening") { placeOpening(index); return; }
     if (state.choosingColour) return;
     if (state.selectedBoardIndex !== null && (state.legalMoves.has(index) || state.legalJumps.has(index))) { moveOrJump(index); return; }
@@ -977,13 +940,6 @@
       if (isComputer(state.pendingSwap.decider)) timer = setTimeout(()=>resolveSwap(computerSwapDecision()), shortDelay);
       return;
     }
-    if (state.cornerReturnFor !== null) {
-      if (isComputer(state.cornerReturnFor)) timer=setTimeout(()=>{
-        const origin=state.heldCorners[state.cornerReturnFor]?.source;
-        if (origin!==undefined) {checkpoint();finishCornerReturn(origin);}
-      },shortDelay);
-      return;
-    }
     if (state.choosingColour && isComputer(state.colourChooser)) { timer = setTimeout(computerChooseColour, shortDelay); return; }
     if (!state.choosingColour && isComputer(state.currentPlayer)) { timer = setTimeout(computerPlay, playDelay); }
   }
@@ -1005,7 +961,6 @@
       return `${playerName(state.winner)} wins${state.winType === "square" ? " with a square" : " with four in a row"}.`;
     }
     if (state.pendingSwap) return `${playerName(state.pendingSwap.decider)}: accept the first placement or take the position?`;
-    if (state.cornerReturnFor !== null) return `${playerName(state.cornerReturnFor)}: select your original outside corner to return your special piece.`;
     if (state.phase === "opening") {
       if (state.choosingColour) return `${playerName(state.colourChooser)}: choose the colour ${playerName(state.currentPlayer)} must place as an Opening Four piece.`;
       return `${playerName(state.currentPlayer)}: place the ${colourName(state.assignedColour)} Opening Four piece on any empty 6×6 corner.`;
@@ -1054,14 +1009,7 @@
             }
             if(enabled && !state.choosingColour && state.selectedReserveIndex===d)piece.classList.add("piece--active-reserve");
             btn.setAttribute("aria-label",`${colourName(special)} outside corner${enabled?" available for Final Four":" — waiting for endgame"}`);
-          } else {
-            if (state.cornerReturnFor !== null && !isComputer(state.cornerReturnFor) &&
-                d === state.heldCorners[state.cornerReturnFor]?.source) {
-              btn.classList.add("selectable", "place-target");
-              btn.addEventListener("click",()=>returnCorner(d));
-              btn.setAttribute("aria-label", "Original outside corner: return your Move/Jump piece here");
-            } else btn.setAttribute("aria-label","Outside corner empty");
-          }
+          } else btn.setAttribute("aria-label", "Outside corner empty");
           boardEl.appendChild(btn);continue;
         }
         const openingTop = state.phase === "opening" ? state.openingReserve[d] : null;
@@ -1144,7 +1092,7 @@
         : completed
           ? state.pendingReturnPlayer === player && state.consequence
             ? "Move/Jump done — qualified; corner returns after compulsory placements"
-            : "Move/Jump done — qualified; return the corner piece"
+            : "Move/Jump done — qualified; corner returns automatically"
           : held ? `${colourName(held.colour)} · Move/Jump needed` : "First colour not yet chosen";
     }
   }
@@ -1170,8 +1118,8 @@
     const whiteCount = activeReserveIndices("white",excludeHeld).length;
     blackBtn.querySelector("small").textContent=`${blackCount} available`;
     whiteBtn.querySelector("small").textContent=`${whiteCount} available`;
-    blackBtn.disabled = !state.choosingColour || isComputer(state.colourChooser) || !availableChoiceColours().includes("black") || !!state.pendingSwap || state.cornerReturnFor !== null;
-    whiteBtn.disabled = !state.choosingColour || isComputer(state.colourChooser) || !availableChoiceColours().includes("white") || !!state.pendingSwap || state.cornerReturnFor !== null;
+    blackBtn.disabled = !state.choosingColour || isComputer(state.colourChooser) || !availableChoiceColours().includes("black") || !!state.pendingSwap;
+    whiteBtn.disabled = !state.choosingColour || isComputer(state.colourChooser) || !availableChoiceColours().includes("white") || !!state.pendingSwap;
     blackBtn.querySelector(".mini-piece").style.background=colourCss("black");
     whiteBtn.querySelector(".mini-piece").style.background=colourCss("white");
 
@@ -1181,7 +1129,6 @@
     const jumpChoice = state.consequence?.type === "jump-choice" && state.choosingColour;
     el("reserve-heading").textContent = state.winner !== null ? "Colours"
       : state.pendingSwap ? "Position decision"
-      : state.cornerReturnFor !== null ? "Return your corner piece"
       : state.choosingColour ? (jumpChoice ? "Choose piece to place" : state.heldCorners.every(piece=>piece===null) ? "Choose first colour" : "Choose a colour")
       : "Colour to use";
     for (const [colour, button] of [["black", blackBtn], ["white", whiteBtn]]) {
@@ -1200,8 +1147,7 @@
         colour === state.consequence.heldColour ? "Originally handed piece" : "Jumped piece";
     }
 
-    reserveInfoEl.textContent = state.cornerReturnFor !== null ? "Your Move/Jump is complete. Return your held piece to its original outside corner."
-      : state.pendingSwap
+    reserveInfoEl.textContent = state.pendingSwap
       ? "Accept the first placement or Take position. Your Move/Jump corner colour stays fixed either way."
       : state.phase === "opening"
       ? "Two same-colour special pieces at each outside corner. The chosen top piece flashes; dots mark where it can be placed."
@@ -1249,7 +1195,7 @@
   }
 
   function clockEnabled(){ return Number(settings.clockMinutes) > 0; }
-  function decisionActor(){ if (!state || state.winner!==null) return null; if(state.pendingSwap) return state.pendingSwap.decider; if(state.cornerReturnFor!==null) return state.cornerReturnFor; return state.choosingColour ? state.colourChooser : state.currentPlayer; }
+  function decisionActor(){ if (!state || state.winner!==null) return null; if(state.pendingSwap) return state.pendingSwap.decider; return state.choosingColour ? state.colourChooser : state.currentPlayer; }
   function formatClock(ms){ const total=Math.max(0,Math.ceil(ms/1000)); return `${Math.floor(total/60)}:${String(total%60).padStart(2,"0")}`; }
   function stopClock(){ if(clockInterval) clearInterval(clockInterval); clockInterval=null; clockActivePlayer=null; clockLastTick=null; renderClocks(); }
   function settleClock(now=Date.now()){
