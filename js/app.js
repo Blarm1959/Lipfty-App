@@ -140,11 +140,9 @@
 
   function freshState(starter = chooseStarter()) {
     const reserve = freshReserve();
+    // v18.0.12 experimental opening: every inner square starts empty.
+    // The four shaped outside specials remain available for qualification and Final Four.
     const board=Array(36).fill(null);
-    // v13.0.4 opening anchors: equal colours on opposite diagonals.
-    [[0,"black"],[5,"white"],[30,"white"],[35,"black"]].forEach(([i,colour])=>{
-      board[i]={id:nextPieceId++,colour,pinned:true,special:true,anchor:true};
-    });
     return {
       phase: "main",
       board,
@@ -262,9 +260,9 @@
     for (const player of [0,1]) {
       if (!state.qualified[player] || !state.heldCorners[player]) continue;
       if (state.pendingReturnPlayer !== player && state.cornerReturnFor !== player) continue;
-      const vacant = CORNERS.find(i => !state.reserve.locked[i]);
-      if (vacant === undefined || !putHeldCorner(player, vacant))
-        throw new Error("No outside corner available for earned return");
+      const origin = state.heldCorners[player].source;
+      if (!putHeldCorner(player, origin))
+        throw new Error("Original outside corner not available for earned return");
     }
     state.pendingReturnPlayer = null;
     state.cornerReturnFor = null;
@@ -289,7 +287,7 @@
 
   function putHeldCorner(player, index) {
     const held = state.heldCorners[player];
-    if (!held || !CORNERS.includes(index) || state.reserve.locked[index]) return false;
+    if (!held || index !== held.source || !CORNERS.includes(index) || state.reserve.locked[index]) return false;
     state.reserve.locked[index] = held.colour;
     state.qualificationCornerColours[player] = held.colour;
     state.heldCorners[player] = null;
@@ -415,10 +413,10 @@
     // A newly earned corner is returned after *both* compulsory placements.
     if (state.pendingReturnPlayer !== null) {
       const player = state.pendingReturnPlayer;
-      // Computer returns automatically to the first empty outside corner.
+      // Computer returns to the *original* outside corner.
       if (isComputer(player)) {
-        const empty = CORNERS.find(i => !state.reserve.locked[i]);
-        if (empty !== undefined) putHeldCorner(player, empty);
+        if (!putHeldCorner(player, state.heldCorners[player].source))
+          throw new Error("Computer's original outside corner was unavailable");
         state.pendingReturnPlayer = null;
       } else {
         state.deferredTurn = {current,chooser,protectedId};
@@ -567,9 +565,8 @@
     clearSelection();
     if (finishWin()) return;
 
-    // Lipfty 14 pie rule: the Opening Four are setup. Only the first ordinary
-    // placement on the remaining 32 squares can be accepted or taken by the
-    // other player. Accept means the other player continues normally; Take
+    // The first ordinary placement on the empty 6×6 can be accepted or taken
+    // by the other player. Accept means the other player continues; Take
     // means they take this position and make the original placer continue.
     if (!state.swapDone && state.phase === "main" && !state.consequence) {
       const placer = state.currentPlayer;
@@ -982,8 +979,8 @@
     }
     if (state.cornerReturnFor !== null) {
       if (isComputer(state.cornerReturnFor)) timer=setTimeout(()=>{
-        const empty=CORNERS.find(i=>!state.reserve.locked[i]);
-        if (empty!==undefined) {checkpoint();finishCornerReturn(empty);}
+        const origin=state.heldCorners[state.cornerReturnFor]?.source;
+        if (origin!==undefined) {checkpoint();finishCornerReturn(origin);}
       },shortDelay);
       return;
     }
@@ -1008,7 +1005,7 @@
       return `${playerName(state.winner)} wins${state.winType === "square" ? " with a square" : " with four in a row"}.`;
     }
     if (state.pendingSwap) return `${playerName(state.pendingSwap.decider)}: accept the first placement or take the position?`;
-    if (state.cornerReturnFor !== null) return `${playerName(state.cornerReturnFor)}: select an empty outside corner to return your earned special piece.`;
+    if (state.cornerReturnFor !== null) return `${playerName(state.cornerReturnFor)}: select your original outside corner to return your special piece.`;
     if (state.phase === "opening") {
       if (state.choosingColour) return `${playerName(state.colourChooser)}: choose the colour ${playerName(state.currentPlayer)} must place as an Opening Four piece.`;
       return `${playerName(state.currentPlayer)}: place the ${colourName(state.assignedColour)} Opening Four piece on any empty 6×6 corner.`;
@@ -1058,10 +1055,11 @@
             if(enabled && !state.choosingColour && state.selectedReserveIndex===d)piece.classList.add("piece--active-reserve");
             btn.setAttribute("aria-label",`${colourName(special)} outside corner${enabled?" available for Final Four":" — waiting for endgame"}`);
           } else {
-            if (state.cornerReturnFor !== null && !isComputer(state.cornerReturnFor)) {
+            if (state.cornerReturnFor !== null && !isComputer(state.cornerReturnFor) &&
+                d === state.heldCorners[state.cornerReturnFor]?.source) {
               btn.classList.add("selectable", "place-target");
               btn.addEventListener("click",()=>returnCorner(d));
-              btn.setAttribute("aria-label", "Empty outside corner: return your Move/Jump piece here");
+              btn.setAttribute("aria-label", "Original outside corner: return your Move/Jump piece here");
             } else btn.setAttribute("aria-label","Outside corner empty");
           }
           boardEl.appendChild(btn);continue;
@@ -1202,7 +1200,7 @@
         colour === state.consequence.heldColour ? "Originally handed piece" : "Jumped piece";
     }
 
-    reserveInfoEl.textContent = state.cornerReturnFor !== null ? "Your Move/Jump is complete. Select an empty outside corner for your held piece."
+    reserveInfoEl.textContent = state.cornerReturnFor !== null ? "Your Move/Jump is complete. Return your held piece to its original outside corner."
       : state.pendingSwap
       ? "Accept the first placement or Take position. Your Move/Jump corner colour stays fixed either way."
       : state.phase === "opening"
@@ -1223,7 +1221,7 @@
   }
 
   function gameIsInProgress(){
-    // Opening anchors are always on the board: do not mistake setup for play.
+    // Starting board is empty; untouched reserve and no owned specials mean no play yet.
     return !!state && state.winner === null && (
       state.swapDone || state.heldCorners.some(Boolean) || state.qualified.some(Boolean) ||
       ordinaryReserveIndices().length < 24 || state.consequence !== null);
