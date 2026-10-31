@@ -1,6 +1,19 @@
 (function () {
   "use strict";
 
+  // This is the version of the JavaScript actually running in this tab.
+  // Build-info can update while an old tab stays open, so never use that
+  // separate file as evidence that the currently executing code is new.
+  const APP_CODE_VERSION = "18.0.16";
+  function isNewerPublishedVersion(published) {
+    if (typeof published !== "string" || !/^\d+\.\d+\.\d+$/.test(published)) return false;
+    const currentParts = APP_CODE_VERSION.split(".").map(Number);
+    const publishedParts = published.split(".").map(Number);
+    for (let i=0; i<3; i++) {
+      if (publishedParts[i] !== currentParts[i]) return publishedParts[i] > currentParts[i];
+    }
+    return false;
+  }
   const R = window.LipftyRules;
   const CORNERS = [0, 7, 56, 63];
   const ANCHORS = [...R.ANCHOR_SQUARES];
@@ -68,7 +81,7 @@
     return {
       mode: "computer", level: "standard", version: "standard", starter: "random",
       player1: "Player", player2: "Player 2", colour1: "red", colour2: "blue",
-      clockMinutes: 0, clockIncrement: 0, sound: true, animations: true, language: "en-GB",
+      clockMinutes: 0, clockIncrement: 0, computerDelay: 2, sound: true, animations: true, language: "en-GB",
       undo: true, colourDefaultsVersion: 1403
     };
   }
@@ -83,6 +96,9 @@
         saved.colourDefaultsVersion = 1403;
       }
       delete saved.matchLength; // retire historical match settings
+      // Persist a valid delay; older installs receive the new 2-second default.
+      saved.computerDelay = [0,1,2,3].includes(Number(saved.computerDelay)) &&
+        saved.computerDelay !== null && saved.computerDelay !== "" ? Number(saved.computerDelay) : 2;
       // The v18 Move/Jump obligation is incompatible with placement-only Learning.
       if (saved.version === "learning") saved.version = "standard";
       return { ...defaultSettings(), ...saved };
@@ -935,13 +951,42 @@
     if (automatic) render();
     if (state.winner !== null) return;
     const shortDelay = settings.animations ? 180 : 0;
-    const playDelay = settings.animations ? 420 : 0;
+    // Delay only visible computer board actions, not colour/Accept decisions.
+    // Re-running processFlow() after each board action also delays each
+    // compulsory placement individually. Animations do not alter this setting.
+    const playDelay = [0,1,2,3].includes(Number(settings.computerDelay)) ?
+      Number(settings.computerDelay) * 1000 : 2000;
     if (state.pendingSwap) {
       if (isComputer(state.pendingSwap.decider)) timer = setTimeout(()=>resolveSwap(computerSwapDecision()), shortDelay);
       return;
     }
     if (state.choosingColour && isComputer(state.colourChooser)) { timer = setTimeout(computerChooseColour, shortDelay); return; }
     if (!state.choosingColour && isComputer(state.currentPlayer)) { timer = setTimeout(computerPlay, playDelay); }
+  }
+
+  // Report only genuinely legal board actions for the currently handed colour.
+  // This mirrors selectBoardPiece() and enumerateComputerActions(), including
+  // the extra reserve needed for Move and the one-colour cutoff.
+  function currentBoardActions() {
+    const options = [];
+    if (!state.choosingColour && !state.redeployPiece && state.board.some(piece=>!piece) &&
+        state.selectedReserveIndex !== null) options.push("Place");
+    if (!canMoveOrJump() || state.choosingColour || !state.assignedColour) return options;
+    let canMove = false, canJump = false;
+    for (let index = 0; index < state.board.length; index++) {
+      const piece = state.board[index];
+      if (!piece || piece.pinned || piece.colour !== state.assignedColour ||
+          piece.id === state.protectedPieceId) continue;
+      if (!canMove && activeReserveIndices(null, state.selectedReserveIndex).length &&
+          R.adjacentDestinations(state.board,index).length) canMove = true;
+      if (!canJump && R.jumpDestinations(state.board,index).some(j =>
+        state.board[j.over] && !state.board[j.over].pinned &&
+        state.board[j.over].colour !== piece.colour)) canJump = true;
+      if (canMove && canJump) break;
+    }
+    if (canMove) options.push("Move");
+    if (canJump) options.push("Jump");
+    return options;
   }
 
   function statusText() {
@@ -965,19 +1010,28 @@
       if (state.choosingColour) return `${playerName(state.colourChooser)}: choose the colour ${playerName(state.currentPlayer)} must place as an Opening Four piece.`;
       return `${playerName(state.currentPlayer)}: place the ${colourName(state.assignedColour)} Opening Four piece on any empty 6×6 corner.`;
     }
-    if (state.consequence?.type === "jump-choice" && state.choosingColour) return `${playerName(state.currentPlayer)}: choose which piece to place after ${playerName(state.consequence.jumper)}'s Jump. Both pieces must be placed before the corner returns.`;
-    if (state.consequence?.type === "move" && state.consequence.step === 1 && state.choosingColour)
-      return `${playerName(state.currentPlayer)}: after ${playerName(state.consequence.mover)}'s Move, choose a reserve piece for your compulsory placement. Their corner returns after both compulsory placements.`;
+    if (state.consequence?.type === "jump-choice" && state.choosingColour) {
+      const firstJump = state.pendingReturnPlayer === state.consequence.jumper;
+      return `${playerName(state.currentPlayer)}: choose which piece to place after ${playerName(state.consequence.jumper)}'s Jump. Both compulsory placements must be completed.${firstJump ? " Their held corner then returns automatically." : ""}`;
+    }
+    if (state.consequence?.type === "move" && state.consequence.step === 1 && state.choosingColour) {
+      const firstMove = state.pendingReturnPlayer === state.consequence.mover;
+      return `${playerName(state.currentPlayer)}: after ${playerName(state.consequence.mover)}'s Move, choose a reserve piece for your compulsory placement.${firstMove ? " Their held corner returns after both compulsory placements." : ""}`;
+    }
     if (state.choosingColour && state.finalFourPhase) return `${playerName(state.currentPlayer)}: choose a Final Four corner piece to place. No Move or Jump.`;
     if (state.choosingColour) return ordinaryReserveIndices(state.consequence?.heldIndex).length
-      ? state.heldCorners.every(piece=>piece===null)
+      ? !state.swapDone && state.heldCorners.every(piece=>piece===null)
         ? `${playerName(state.colourChooser)}: choose the first colour for ${playerName(state.firstPlacer)}. Their special will match; yours will be the opposite colour.`
         : `${playerName(state.colourChooser)}: choose a reserve piece/colour for ${playerName(state.currentPlayer)}.`
       : "No ordinary reserve piece remains.";
     if (state.redeployPiece) return `${playerName(state.currentPlayer)}: place the jumped ${colourName(state.redeployPiece.colour)} piece on any empty square.`;
     if (state.consequence?.type === "move" && state.consequence.step === 2) return `${playerName(state.currentPlayer)}: now place the originally handed ${colourName(state.assignedColour)} piece on any empty square.`;
-    if (!canMoveOrJump()) return `${playerName(state.currentPlayer)}: place the ${colourName(state.assignedColour)} piece on any empty square.`;
-    return `${playerName(state.currentPlayer)}: Place, Move or Jump using ${colourName(state.assignedColour)}.`;
+    const actions = currentBoardActions();
+    if (!actions.length) return `${playerName(state.currentPlayer)}: no legal board action remains.`;
+    if (actions.length === 1 && actions[0] === "Place")
+      return `${playerName(state.currentPlayer)}: place the ${colourName(state.assignedColour)} piece on any empty square.`;
+    const choices = actions.length === 3 ? actions.join(", ").replace(", Jump", " or Jump") : actions.join(" or ");
+    return `${playerName(state.currentPlayer)}: ${choices} using ${colourName(state.assignedColour)}.`;
   }
 
   function renderPiece(colour, special=false, locked=false) {
@@ -1085,14 +1139,12 @@
       const completed = !!state.qualified[player];
       const returned = completed && !held;
       const token = el(`qualification-piece-${player}`);
-      token.className = `piece piece--special qualification-token ${colour ? `piece--${colour}` : "qualification-token--unassigned"}${completed ? " qualification-token--returned" : ""}`;
+      token.className = `piece piece--special qualification-token ${colour ? `piece--${colour}` : "qualification-token--unassigned"}${completed ? " qualification-token--returned" : ""}${returned ? " qualification-token--corner-returned" : ""}`;
       el(`qualification-name-${player}`).textContent = playerName(player);
       el(`qualification-status-${player}`).textContent = returned
-        ? `${colour ? colourName(colour) + " · " : ""}Returned — can win`
+        ? `${colour ? colourName(colour) + " · " : ""}Corner returned — ready to win ✓`
         : completed
-          ? state.pendingReturnPlayer === player && state.consequence
-            ? "Move/Jump done — qualified; corner returns after compulsory placements"
-            : "Move/Jump done — qualified; corner returns automatically"
+          ? "Move/Jump complete — corner return pending"
           : held ? `${colourName(held.colour)} · Move/Jump needed` : "First colour not yet chosen";
     }
   }
@@ -1129,7 +1181,7 @@
     const jumpChoice = state.consequence?.type === "jump-choice" && state.choosingColour;
     el("reserve-heading").textContent = state.winner !== null ? "Colours"
       : state.pendingSwap ? "Position decision"
-      : state.choosingColour ? (jumpChoice ? "Choose piece to place" : state.heldCorners.every(piece=>piece===null) ? "Choose first colour" : "Choose a colour")
+      : state.choosingColour ? (jumpChoice ? "Choose piece to place" : !state.swapDone && state.heldCorners.every(piece=>piece===null) ? "Choose first colour" : "Choose a colour")
       : "Colour to use";
     for (const [colour, button] of [["black", blackBtn], ["white", whiteBtn]]) {
       const required = activeColour === colour;
@@ -1153,7 +1205,7 @@
       ? "Two same-colour special pieces at each outside corner. The chosen top piece flashes; dots mark where it can be placed."
       : state.redeployPiece ? `Place the jumped ${colourName(state.redeployPiece.colour)} piece on a dotted square.`
       : state.finalFourPhase ? "Final Four: choose a shaped corner piece and place it. No Move or Jump."
-      : "Complete one Move or Jump before you can win. Your special piece returns after its compulsory placements. Otherwise use the handed colour to Place, Move or Jump.";
+      : "Complete one Move or Jump before you can win. Your special piece returns after its compulsory placements. The top message shows which actions are currently legal.";
 
     swapBox.hidden = !state.pendingSwap || isComputer(state.pendingSwap?.decider);
     jumpChoiceBox.hidden = !(state.consequence?.type === "jump-choice" && state.choosingColour && !isComputer(state.colourChooser));
@@ -1281,22 +1333,22 @@
   function buildColours(id,name){const box=el(id);box.replaceChildren();for(const k of colourOptions){const l=document.createElement("label");l.className="colour-choice";l.innerHTML=`<input type="radio" name="${name}" value="${k}"><span><i class="colour-swatch" style="background:${COLOURS[k][1]}"></i>${COLOURS[k][0]}</span>`;box.appendChild(l);}}
   buildColours("colour1-choices","colour1");buildColours("colour2-choices","colour2");
   function fv(n){return settingsForm.querySelector(`[name="${n}"]:checked`)?.value;} function sr(n,v){const x=settingsForm.querySelector(`[name="${n}"][value="${v}"]`);if(x)x.checked=true;}
-  function syncMode(){const one=fv("gameMode")==="computer";el("difficulty-field").hidden=!one;el("player2-label").hidden=one;el("player1-label-text").textContent=one?"Player name":"Player 1 name";el("starter-player-label").textContent=one?"Player":"Player 1";el("starter-other-label").textContent=one?"Computer":"Player 2";}
+  function syncMode(){const one=fv("gameMode")==="computer";el("difficulty-field").hidden=!one;el("computer-delay-field").hidden=!one;el("player2-label").hidden=one;el("player1-label-text").textContent=one?"Player name":"Player 1 name";el("starter-player-label").textContent=one?"Player":"Player 1";el("starter-other-label").textContent=one?"Computer":"Player 2";}
   function syncDifficulty(){const n=Number(el("difficulty-input").value),names=["","Beginner","Standard","Expert"];el("difficulty-name").textContent=`${n} · ${names[n]}`;}
   function syncClockOptions(){const enabled=Number(fv("clockMinutes")||0)>0;el("clock-increment-field").disabled=!enabled;if(!enabled)sr("clockIncrement","0");}
   function showStep(n){wizardStep=Math.max(0,Math.min(5,n));wizardSteps.forEach((x,i)=>x.hidden=i!==wizardStep);wizardIndicators.forEach((x,i)=>{x.classList.toggle("wizard-progress-step--active",i===wizardStep);x.classList.toggle("wizard-progress-step--complete",i<wizardStep);});wizardDefault.hidden=wizardStep!==0;wizardBack.hidden=wizardStep===0;wizardNext.hidden=wizardStep===5;wizardSave.hidden=false;if(wizardStep===5)summary();}
-  function summary(){const one=fv("gameMode")==="computer",mins=Number(fv("clockMinutes")||0),inc=Number(fv("clockIncrement")||0),clock=mins?`${mins} min each${inc?` + ${inc}s`:""}`:"Clock off";el("setup-summary").textContent=`Lipfty · ${one?"Player vs Computer":"Two players"} · ${COLOURS[fv("colour1")][0]} / ${COLOURS[fv("colour2")][0]} · ${({standard:"Easy",medium:"Medium",extreme:"Standard"})[fv("gameVersion")||"standard"]} · ${clock}`;}
-  function loadForm(){sr("gameMode",settings.mode);el("difficulty-input").value=settings.level==="beginner"?1:settings.level==="expert"?3:2;sr("allowUndo",settings.undo?"yes":"no");sr("colour1",settings.colour1);sr("colour2",settings.colour2);sr("gameVersion",settings.version);el("setting-player1").value=settings.player1||"Player";el("setting-player2").value=settings.player2||"Player 2";sr("starter",settings.starter);sr("clockMinutes",String(settings.clockMinutes||0));sr("clockIncrement",String(settings.clockIncrement||0));el("setting-sound").checked=settings.sound!==false;el("setting-animations").checked=settings.animations!==false;el("setting-language").value=settings.language||"en-GB";syncMode();syncDifficulty();syncClockOptions();showStep(0);}
+  function summary(){const one=fv("gameMode")==="computer",mins=Number(fv("clockMinutes")||0),inc=Number(fv("clockIncrement")||0),clock=mins?`${mins} min each${inc?` + ${inc}s`:""}`:"Clock off";el("setup-summary").textContent=`Lipfty · ${one?"Player vs Computer":"Two players"} · ${COLOURS[fv("colour1")][0]} / ${COLOURS[fv("colour2")][0]} · ${({standard:"Easy",medium:"Medium",extreme:"Standard"})[fv("gameVersion")||"standard"]} · ${clock}${one ? ` · Computer play delay ${fv("computerDelay")||"0"}s` : ""}`;}
+  function loadForm(){sr("gameMode",settings.mode);el("difficulty-input").value=settings.level==="beginner"?1:settings.level==="expert"?3:2;sr("allowUndo",settings.undo?"yes":"no");sr("colour1",settings.colour1);sr("colour2",settings.colour2);sr("gameVersion",settings.version);el("setting-player1").value=settings.player1||"Player";el("setting-player2").value=settings.player2||"Player 2";sr("starter",settings.starter);sr("clockMinutes",String(settings.clockMinutes||0));sr("clockIncrement",String(settings.clockIncrement||0));sr("computerDelay",String(settings.computerDelay));el("setting-sound").checked=settings.sound!==false;el("setting-animations").checked=settings.animations!==false;el("setting-language").value=settings.language||"en-GB";syncMode();syncDifficulty();syncClockOptions();showStep(0);}
   function setDefaultForm(){
     const d=defaultSettings();
     sr("gameMode",d.mode); el("difficulty-input").value=d.level==="beginner"?1:d.level==="expert"?3:2;
     sr("allowUndo",d.undo?"yes":"no"); sr("colour1",d.colour1); sr("colour2",d.colour2); sr("gameVersion",d.version); 
     el("setting-player1").value=d.player1; el("setting-player2").value=d.player2; sr("starter",d.starter);
-    sr("clockMinutes",String(d.clockMinutes)); sr("clockIncrement",String(d.clockIncrement));
+    sr("clockMinutes",String(d.clockMinutes)); sr("clockIncrement",String(d.clockIncrement)); sr("computerDelay",String(d.computerDelay));
     el("setting-sound").checked=d.sound; el("setting-animations").checked=d.animations; el("setting-language").value=d.language;
     syncMode(); syncDifficulty(); syncClockOptions();
   }
-  function commitSettings(){const c1=fv("colour1"),c2=fv("colour2");if(!c1||!c2||c1===c2){showStep(1);statusEl.textContent="Choose two different piece colours.";return false;}const n=Number(el("difficulty-input").value);settings={...settings,mode:fv("gameMode"),level:n===1?"beginner":n===3?"expert":"standard",version:fv("gameVersion")||"standard",starter:fv("starter")||"random",player1:el("setting-player1").value.trim()||"Player",player2:el("setting-player2").value.trim()||"Player 2",colour1:c1,colour2:c2,clockMinutes:Number(fv("clockMinutes")||0),clockIncrement:Number(fv("clockIncrement")||0),sound:el("setting-sound").checked,animations:el("setting-animations").checked,language:el("setting-language").value,undo:fv("allowUndo")==="yes",colourDefaultsVersion:1403};saveSettings();settingsDialog.close();startGame();return true;}
+  function commitSettings(){const c1=fv("colour1"),c2=fv("colour2");if(!c1||!c2||c1===c2){showStep(1);statusEl.textContent="Choose two different piece colours.";return false;}const n=Number(el("difficulty-input").value);settings={...settings,mode:fv("gameMode"),level:n===1?"beginner":n===3?"expert":"standard",version:fv("gameVersion")||"standard",starter:fv("starter")||"random",player1:el("setting-player1").value.trim()||"Player",player2:el("setting-player2").value.trim()||"Player 2",colour1:c1,colour2:c2,clockMinutes:Number(fv("clockMinutes")||0),clockIncrement:Number(fv("clockIncrement")||0),computerDelay:Number(fv("computerDelay")||0),sound:el("setting-sound").checked,animations:el("setting-animations").checked,language:el("setting-language").value,undo:fv("allowUndo")==="yes",colourDefaultsVersion:1403};saveSettings();settingsDialog.close();startGame();return true;}
   el("settings-button").addEventListener("click",()=>{loadForm();settingsDialog.showModal();});el("close-settings").addEventListener("click",()=>settingsDialog.close());wizardBack.addEventListener("click",()=>showStep(wizardStep-1));wizardNext.addEventListener("click",()=>{if(wizardStep===1&&fv("colour1")===fv("colour2")){statusEl.textContent="Choose two different piece colours.";return;}showStep(wizardStep+1);});wizardDefault.addEventListener("click",setDefaultForm);settingsForm.addEventListener("submit",e=>{e.preventDefault();commitSettings();});
   wizardIndicators.forEach((x,i)=>{x.setAttribute("role","button");x.tabIndex=0;x.addEventListener("click",()=>showStep(i));x.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();showStep(i);}});});
   settingsForm.querySelectorAll('[name="gameMode"]').forEach(x=>x.addEventListener("change",syncMode));el("difficulty-input").addEventListener("input",syncDifficulty);settingsForm.querySelectorAll('[name="clockMinutes"]').forEach(x=>x.addEventListener("change",syncClockOptions));
@@ -1304,7 +1356,27 @@
   el("help-button").addEventListener("click",()=>el("help-dialog").showModal());el("close-help").addEventListener("click",()=>el("help-dialog").close());
   el("view-statistics-button").addEventListener("click",()=>{renderStatistics();el("statistics-dialog").showModal();});el("close-statistics").addEventListener("click",()=>el("statistics-dialog").close());el("reset-statistics").addEventListener("click",()=>{if(confirm("Reset all Lipfty statistics on this device?")){localStorage.removeItem(STATS_KEY);renderStatistics();}});
 
-  fetch("./build-info.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(info=>{const v=info?.version||"16.0.4";el("app-version").textContent=`Version ${v}`;el("mobile-version").textContent=`v${v}`;const ref=info?.commit||info?.gitCommit||"";el("build-reference").textContent=ref?` · ${String(ref).slice(0,7)}`:"";}).catch(()=>{el("app-version").textContent="Version 16.0.4";});
+  // Version displayed must describe the executing app.js, not a newer
+  // build-info.json downloaded into an older tab after publication.
+  el("app-version").textContent=`Version ${APP_CODE_VERSION}`;
+  el("mobile-version").textContent=`v${APP_CODE_VERSION}`;
+  fetch("./build-info.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(info=>{
+    const published = info?.version;
+    if (isNewerPublishedVersion(published)) {
+      el("app-version").textContent=`Running v${APP_CODE_VERSION} · Update v${published} available`;
+      el("mobile-version").textContent=`v${APP_CODE_VERSION} · Update available`;
+      el("build-reference").textContent="";
+      // A game already in progress must never be discarded automatically.
+      // The player explicitly approves a refresh to load the new code.
+      if (typeof window.confirm === "function" &&
+          window.confirm(`Lipfty v${published} is published, but this tab is running v${APP_CODE_VERSION}. Reload now to use the new game code?`)) {
+        window.location.reload();
+      }
+      return;
+    }
+    const ref=info?.commit||info?.gitCommit||"";
+    el("build-reference").textContent=ref?` · ${String(ref).slice(0,7)}`:"";
+  }).catch(()=>{});
   let pendingUpdateRegistration = null;
   let updatePromptHandled = false;
   let reloadingForUpdate = false;

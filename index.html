@@ -153,6 +153,15 @@
 
       <section class="wizard-step" data-wizard-step="5" hidden>
         <h3>Game options</h3>
+        <fieldset class="setup-fieldset" id="computer-delay-field"><legend>Computer play delay</legend>
+          <p class="setup-help">Pause before every computer Place, Move, Jump and compulsory placement. The 2-second default makes each action easier to follow.</p>
+          <div class="choice-grid computer-delay-grid">
+            <label><input name="computerDelay" type="radio" value="0"><span>Immediate</span></label>
+            <label><input name="computerDelay" type="radio" value="1"><span>1 second</span></label>
+            <label><input checked name="computerDelay" type="radio" value="2"><span>2 seconds (default)</span></label>
+            <label><input name="computerDelay" type="radio" value="3"><span>3 seconds</span></label>
+          </div>
+        </fieldset>
         <fieldset class="setup-fieldset"><legend>Game feel</legend><div class="toggle-list"><label class="toggle-row"><span><strong>Sound effects</strong></span><input checked id="setting-sound" type="checkbox"></label><label class="toggle-row"><span><strong>Animations</strong></span><input checked id="setting-animations" type="checkbox"></label></div></fieldset>
         <fieldset class="setup-fieldset"><legend>Language</legend><select class="text-input" id="setting-language"><option value="en-GB">British English</option></select></fieldset>
         <button class="button button--secondary settings-statistics-button" id="view-statistics-button" type="button">View statistics</button>
@@ -179,16 +188,17 @@
     <p><strong>Setup.</strong> All 36 squares of the inner 6×6 begin empty. Place 24 ordinary reserves (12 of each colour) around the non-corner outside edges and four shaped specials (two per colour) on the four outside corners. The starting chooser picks the first ordinary reserve colour for the opponent, who becomes the first placer. That colour also fixes the opponent’s held special; the chooser automatically holds the opposite-colour special. The other two specials remain on the outer corners. Neither player makes a separate special-piece choice.</p>
     <p><strong>First placement.</strong> The opponent places the first ordinary piece of the chosen colour. The chooser then selects Accept or Take position. The first piece stays where placed and both players keep their already-assigned held special colours, regardless of the decision. When the computer makes this decision, a popup explains the result; press OK to continue. Subsequent ordinary colours remain opponent-selected.</p>
     <p><strong>Normal play.</strong> The opponent selects an ordinary reserve piece. Place it, Move an unpinned board piece of that colour one adjacent square or Jump over one adjacent opposite-colour unpinned piece. Your first successful Move/Jump qualifies you to win. After its compulsory placements, the game automatically returns your held special to an empty outside corner. You may Move and Jump again freely. A winning Move/Jump ends the game immediately and automatically returns your earned special.</p>
-    <p><strong>Move consequence.</strong> The opponent chooses and places another ordinary reserve piece; the mover places the exact held piece. A Move requires another ordinary reserve besides the held piece. With only one reserve left, Place or an otherwise legal Jump is available.</p>
+    <p><strong>Move consequence.</strong> The opponent chooses and places another ordinary reserve piece; the mover places the exact held piece. A Move requires another ordinary reserve besides the held piece. When either ordinary reserve colour runs out, both Move and Jump become unavailable and turns are Place-only.</p>
     <p><strong>Jump consequence.</strong> The opponent chooses and places either the exact held piece or exact jumped piece; the jumper places the other. Final Four pieces are not used during compulsory placements.</p>
     <p><strong>Deadline and Final Four.</strong> After compulsory placements are finished, if either ordinary reserve colour runs out and one player has not qualified, that player loses. If neither qualified, the initial ordinary placer loses. Otherwise Move/Jump ends at this one-colour cutoff, and the remaining ordinary pieces are Place-only. Once all ordinary pieces are used, the four outside specials enter the 6×6 one at a time and become permanently pinned on placement. If they are all used without a winner, the game is a draw.</p>
     <p><strong>Wins and protection.</strong> A four-piece pattern wins only if the acting player has already completed a Move or Jump, including the action currently being performed. A win cancels all remaining compulsory placements. The moved/jumped piece is temporarily protected, as in v17.</p>
     <p><strong>Continuing.</strong> New game starts a fresh game with the reserves and corners reset. Applying Settings also starts a new game. Clocks reset; individual-game statistics are retained.</p>
+    <p><strong>Computer play speed.</strong> In Settings choose Immediate, 1, 2 or 3 seconds (2 seconds by default). Each computer board action, including each compulsory placement, is delayed separately. Human actions are not delayed. The clock and Undo otherwise work as before.</p>
     <p><strong>Clock and Undo.</strong> Time expiry loses. Undo restores position, clock and statistics and returns to a human decision against the computer.</p>
   </div></dialog>
 
-  <script src="js/rules.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/rules.js?v=18.0.16"></script>
+  <script src="js/app.js?v=18.0.16"></script>
 </body>
 </html>
 

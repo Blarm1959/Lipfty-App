@@ -207,3 +207,10 @@ html.animations-off .piece--available-reserve,html.animations-off .piece--active
 .opening-decision-actions{display:flex;justify-content:flex-end;margin-top:20px}
 .opening-decision-actions .button{min-width:86px}
 @media(max-width:560px){.opening-decision-inner{padding:18px}.opening-decision-dialog h2{font-size:1.12rem}}
+
+/* v18.0.16: keep computer delay options legible, and mark completed returns. */
+.computer-delay-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+#computer-delay-field[hidden]{display:none!important}
+.qualification-token--corner-returned{position:relative;opacity:.52;filter:grayscale(1)}
+.qualification-token--corner-returned::after{content:"✓";position:absolute;right:-7px;bottom:-7px;display:grid;place-items:center;width:19px;height:19px;border-radius:50%;background:#217c48;color:#fff;font-size:13px;font-weight:900;filter:none}
+@media(max-width:560px){.computer-delay-grid{grid-template-columns:1fr 1fr}}

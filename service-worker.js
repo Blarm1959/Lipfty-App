@@ -1,8 +1,8 @@
-const VERSION = "18.0.14";
+const VERSION = "18.0.16";
 const CACHE = `lipfty-v${VERSION}`;
 const ASSETS = [
   "./", "./index.html", "./offline.html", "./css/style.css", "./css/lipfty8-layout.css",
-  "./js/rules.js", "./js/app.js", "./manifest.json", "./package.json", "./build-info.json"
+  "./js/rules.js?v=18.0.16", "./js/app.js?v=18.0.16", "./manifest.json", "./package.json", "./build-info.json"
 ];
 
 self.addEventListener("install", event => {
