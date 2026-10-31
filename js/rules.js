@@ -60,8 +60,8 @@
     }
 
     if (options.allowSquare) {
-      const patterns = options.allowSpacedSquare ? AXIS_SQUARES : TIGHT_SQUARES;
-      for (const pattern of patterns) {
+      // Spaced-square victories were retired in v18.0.17 for all modes.
+      for (const pattern of TIGHT_SQUARES) {
         if (pattern.some(i => blocked.has(i))) continue;
         const colour = allSameColour(board, pattern);
         if (colour) return { line: [...pattern], colour, type: "square" };

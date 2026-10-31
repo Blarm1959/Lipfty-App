@@ -96,7 +96,7 @@
       <section class="action-bar">
         <div class="action-bar-left"><button class="button button--secondary" id="new-game" type="button">New game</button></div>
         <div class="action-bar-centre"><button class="button button--secondary" id="undo" type="button">Undo</button></div>
-        <div class="build-info"><span id="app-version">Version 16.0.4</span><span id="build-reference"></span></div>
+        <div class="build-info"><span id="app-version">Version 18.0.17</span><span id="build-reference"></span></div>
       </section>
     </main>
   </div>
@@ -134,8 +134,7 @@
         <fieldset class="setup-fieldset"><legend>Version</legend><div class="mode-choice-grid version-choice-grid">
           
           <label class="mode-choice"><input checked name="gameVersion" type="radio" value="standard"><span><strong>Easy</strong><small>Four in a line</small></span></label>
-          <label class="mode-choice"><input name="gameVersion" type="radio" value="medium"><span><strong>Medium</strong><small>Four in a line or tight (2×2) square</small></span></label>
-          <label class="mode-choice"><input name="gameVersion" type="radio" value="extreme"><span><strong>Standard</strong><small>Four in a line, tight or spaced square</small></span></label>
+          <label class="mode-choice"><input name="gameVersion" type="radio" value="medium"><span><strong>Standard</strong><small>Four in a line or tight 2×2 square</small></span></label>
         </div></fieldset>
       </section>
 
@@ -184,7 +183,7 @@
   <dialog id="statistics-dialog"><div class="dialog-heading"><div><p class="dialog-eyebrow">Lipfty</p><h2>Statistics</h2></div><button class="dialog-close" id="close-statistics" type="button">×</button></div><div id="statistics-content" class="statistics-content"></div><div class="dialog-actions"><button class="button button--secondary" id="reset-statistics" type="button">Reset statistics</button></div></dialog>
 
   <dialog id="help-dialog"><div class="dialog-heading"><div><p class="dialog-eyebrow">How to play</p><h2>Lipfty</h2></div><button class="dialog-close" id="close-help" type="button" aria-label="Close">×</button></div><div class="rules-copy"><p><a href="Lipfty-Rules.pdf" target="_blank" rel="noopener">Printable rules (PDF)</a> · <a href="Lipfty-Rules.md" target="_blank" rel="noopener">Rules source (Markdown)</a></p>
-    <p><strong>Objective.</strong> After you have completed at least one Move or Jump, make four of either shared colour in a horizontal, vertical or diagonal line (Easy). Medium also allows tight 2×2 squares; Standard additionally allows spaced axis-aligned squares. All other rules are identical and your opponent need not have qualified.</p>
+    <p><strong>Objective.</strong> After you have completed at least one Move or Jump, make four of either shared colour in a horizontal, vertical or diagonal line (Easy). Standard also allows tight 2×2 squares. Larger spaced squares do not win. All other rules are identical and your opponent need not have qualified.</p>
     <p><strong>Setup.</strong> All 36 squares of the inner 6×6 begin empty. Place 24 ordinary reserves (12 of each colour) around the non-corner outside edges and four shaped specials (two per colour) on the four outside corners. The starting chooser picks the first ordinary reserve colour for the opponent, who becomes the first placer. That colour also fixes the opponent’s held special; the chooser automatically holds the opposite-colour special. The other two specials remain on the outer corners. Neither player makes a separate special-piece choice.</p>
     <p><strong>First placement.</strong> The opponent places the first ordinary piece of the chosen colour. The chooser then selects Accept or Take position. The first piece stays where placed and both players keep their already-assigned held special colours, regardless of the decision. When the computer makes this decision, a popup explains the result; press OK to continue. Subsequent ordinary colours remain opponent-selected.</p>
     <p><strong>Normal play.</strong> The opponent selects an ordinary reserve piece. Place it, Move an unpinned board piece of that colour one adjacent square or Jump over one adjacent opposite-colour unpinned piece. Your first successful Move/Jump qualifies you to win. After its compulsory placements, the game automatically returns your held special to an empty outside corner. You may Move and Jump again freely. A winning Move/Jump ends the game immediately and automatically returns your earned special.</p>
@@ -197,8 +196,8 @@
     <p><strong>Clock and Undo.</strong> Time expiry loses. Undo restores position, clock and statistics and returns to a human decision against the computer.</p>
   </div></dialog>
 
-  <script src="js/rules.js?v=18.0.16"></script>
-  <script src="js/app.js?v=18.0.16"></script>
+  <script src="js/rules.js?v=18.0.17"></script>
+  <script src="js/app.js?v=18.0.17"></script>
 </body>
 </html>
 

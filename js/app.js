@@ -4,7 +4,7 @@
   // This is the version of the JavaScript actually running in this tab.
   // Build-info can update while an old tab stays open, so never use that
   // separate file as evidence that the currently executing code is new.
-  const APP_CODE_VERSION = "18.0.16";
+  const APP_CODE_VERSION = "18.0.17";
   function isNewerPublishedVersion(published) {
     if (typeof published !== "string" || !/^\d+\.\d+\.\d+$/.test(published)) return false;
     const currentParts = APP_CODE_VERSION.split(".").map(Number);
@@ -101,6 +101,10 @@
         saved.computerDelay !== null && saved.computerDelay !== "" ? Number(saved.computerDelay) : 2;
       // The v18 Move/Jump obligation is incompatible with placement-only Learning.
       if (saved.version === "learning") saved.version = "standard";
+      // Upgrade retired spaced-square Standard to the new tight-square Standard.
+      // Internal identifiers are retained so previously saved Easy stays Easy.
+      if (saved.version === "extreme") saved.version = "medium";
+      if (!["standard","medium"].includes(saved.version)) saved.version = "standard";
       return { ...defaultSettings(), ...saved };
     } catch (_) { return defaultSettings(); }
   }
@@ -260,8 +264,8 @@
   function ruleOptions() {
     return {
       allowDiagonal: true,
-      allowSquare: settings.version === "medium" || settings.version === "extreme",
-      allowSpacedSquare: settings.version === "extreme",
+      // Easy uses lines only. Standard adds tight 2x2 squares; no spaced wins.
+      allowSquare: settings.version === "medium",
       inactiveWinCells: blockedAnchors()
     };
   }
@@ -684,7 +688,7 @@
   function patternsFor(options) {
     const blocked = new Set(options.inactiveWinCells || []);
     const patterns = [...R.ORTHOGONAL_LINES, ...R.DIAGONAL_LINES];
-    if (options.allowSquare) patterns.push(...(options.allowSpacedSquare ? R.AXIS_SQUARES : R.TIGHT_SQUARES));
+    if (options.allowSquare) patterns.push(...R.TIGHT_SQUARES);
     return patterns.filter(pattern => !pattern.some(i => blocked.has(i)));
   }
 
@@ -1156,13 +1160,11 @@
     statusEl.textContent = statusText() + (state.lastReleaseMessage ? ` ${state.lastReleaseMessage}.` : "");
     state.lastReleaseMessage = "";
 
-    const versionTitle = settings.version === "extreme" ? "Standard" : settings.version === "medium" ? "Medium" : "Easy";
+    const versionTitle = settings.version === "medium" ? "Standard" : "Easy";
     el("quick-rules-title").textContent = `Lipfty · ${versionTitle}`;
-    el("quick-win-rule").innerHTML = settings.version === "extreme"
-      ? "<strong>Win:</strong> Move/Jump first, then four in a line, tight square or spaced square."
-      : settings.version === "medium"
-        ? "<strong>Win:</strong> Move/Jump first, then four in a line or tight square (no spaced squares)."
-        : "<strong>Win:</strong> Move/Jump first, then four in a line.";
+    el("quick-win-rule").innerHTML = settings.version === "medium"
+      ? "<strong>Win:</strong> Move/Jump first, then four in a line or tight 2×2 square."
+      : "<strong>Win:</strong> Move/Jump first, then four in a line.";
     blackBtn.querySelector("strong").textContent=colourName("black");
     whiteBtn.querySelector("strong").textContent=colourName("white");
     const excludeHeld = state.consequence?.type === "move" ? state.consequence.heldIndex : null;
@@ -1337,8 +1339,8 @@
   function syncDifficulty(){const n=Number(el("difficulty-input").value),names=["","Beginner","Standard","Expert"];el("difficulty-name").textContent=`${n} · ${names[n]}`;}
   function syncClockOptions(){const enabled=Number(fv("clockMinutes")||0)>0;el("clock-increment-field").disabled=!enabled;if(!enabled)sr("clockIncrement","0");}
   function showStep(n){wizardStep=Math.max(0,Math.min(5,n));wizardSteps.forEach((x,i)=>x.hidden=i!==wizardStep);wizardIndicators.forEach((x,i)=>{x.classList.toggle("wizard-progress-step--active",i===wizardStep);x.classList.toggle("wizard-progress-step--complete",i<wizardStep);});wizardDefault.hidden=wizardStep!==0;wizardBack.hidden=wizardStep===0;wizardNext.hidden=wizardStep===5;wizardSave.hidden=false;if(wizardStep===5)summary();}
-  function summary(){const one=fv("gameMode")==="computer",mins=Number(fv("clockMinutes")||0),inc=Number(fv("clockIncrement")||0),clock=mins?`${mins} min each${inc?` + ${inc}s`:""}`:"Clock off";el("setup-summary").textContent=`Lipfty · ${one?"Player vs Computer":"Two players"} · ${COLOURS[fv("colour1")][0]} / ${COLOURS[fv("colour2")][0]} · ${({standard:"Easy",medium:"Medium",extreme:"Standard"})[fv("gameVersion")||"standard"]} · ${clock}${one ? ` · Computer play delay ${fv("computerDelay")||"0"}s` : ""}`;}
-  function loadForm(){sr("gameMode",settings.mode);el("difficulty-input").value=settings.level==="beginner"?1:settings.level==="expert"?3:2;sr("allowUndo",settings.undo?"yes":"no");sr("colour1",settings.colour1);sr("colour2",settings.colour2);sr("gameVersion",settings.version);el("setting-player1").value=settings.player1||"Player";el("setting-player2").value=settings.player2||"Player 2";sr("starter",settings.starter);sr("clockMinutes",String(settings.clockMinutes||0));sr("clockIncrement",String(settings.clockIncrement||0));sr("computerDelay",String(settings.computerDelay));el("setting-sound").checked=settings.sound!==false;el("setting-animations").checked=settings.animations!==false;el("setting-language").value=settings.language||"en-GB";syncMode();syncDifficulty();syncClockOptions();showStep(0);}
+  function summary(){const one=fv("gameMode")==="computer",mins=Number(fv("clockMinutes")||0),inc=Number(fv("clockIncrement")||0),clock=mins?`${mins} min each${inc?` + ${inc}s`:""}`:"Clock off";el("setup-summary").textContent=`Lipfty · ${one?"Player vs Computer":"Two players"} · ${COLOURS[fv("colour1")][0]} / ${COLOURS[fv("colour2")][0]} · ${({standard:"Easy",medium:"Standard"})[fv("gameVersion")||"standard"]} · ${clock}${one ? ` · Computer play delay ${fv("computerDelay")||"0"}s` : ""}`;}
+  function loadForm(){if (settings.version === "extreme") settings.version = "medium";sr("gameMode",settings.mode);el("difficulty-input").value=settings.level==="beginner"?1:settings.level==="expert"?3:2;sr("allowUndo",settings.undo?"yes":"no");sr("colour1",settings.colour1);sr("colour2",settings.colour2);sr("gameVersion",settings.version);el("setting-player1").value=settings.player1||"Player";el("setting-player2").value=settings.player2||"Player 2";sr("starter",settings.starter);sr("clockMinutes",String(settings.clockMinutes||0));sr("clockIncrement",String(settings.clockIncrement||0));sr("computerDelay",String(settings.computerDelay));el("setting-sound").checked=settings.sound!==false;el("setting-animations").checked=settings.animations!==false;el("setting-language").value=settings.language||"en-GB";syncMode();syncDifficulty();syncClockOptions();showStep(0);}
   function setDefaultForm(){
     const d=defaultSettings();
     sr("gameMode",d.mode); el("difficulty-input").value=d.level==="beginner"?1:d.level==="expert"?3:2;
@@ -1348,7 +1350,7 @@
     el("setting-sound").checked=d.sound; el("setting-animations").checked=d.animations; el("setting-language").value=d.language;
     syncMode(); syncDifficulty(); syncClockOptions();
   }
-  function commitSettings(){const c1=fv("colour1"),c2=fv("colour2");if(!c1||!c2||c1===c2){showStep(1);statusEl.textContent="Choose two different piece colours.";return false;}const n=Number(el("difficulty-input").value);settings={...settings,mode:fv("gameMode"),level:n===1?"beginner":n===3?"expert":"standard",version:fv("gameVersion")||"standard",starter:fv("starter")||"random",player1:el("setting-player1").value.trim()||"Player",player2:el("setting-player2").value.trim()||"Player 2",colour1:c1,colour2:c2,clockMinutes:Number(fv("clockMinutes")||0),clockIncrement:Number(fv("clockIncrement")||0),computerDelay:Number(fv("computerDelay")||0),sound:el("setting-sound").checked,animations:el("setting-animations").checked,language:el("setting-language").value,undo:fv("allowUndo")==="yes",colourDefaultsVersion:1403};saveSettings();settingsDialog.close();startGame();return true;}
+  function commitSettings(){const c1=fv("colour1"),c2=fv("colour2");if(!c1||!c2||c1===c2){showStep(1);statusEl.textContent="Choose two different piece colours.";return false;}const n=Number(el("difficulty-input").value);settings={...settings,mode:fv("gameMode"),level:n===1?"beginner":n===3?"expert":"standard",version:fv("gameVersion")==="medium"?"medium":"standard",starter:fv("starter")||"random",player1:el("setting-player1").value.trim()||"Player",player2:el("setting-player2").value.trim()||"Player 2",colour1:c1,colour2:c2,clockMinutes:Number(fv("clockMinutes")||0),clockIncrement:Number(fv("clockIncrement")||0),computerDelay:Number(fv("computerDelay")||0),sound:el("setting-sound").checked,animations:el("setting-animations").checked,language:el("setting-language").value,undo:fv("allowUndo")==="yes",colourDefaultsVersion:1403};saveSettings();settingsDialog.close();startGame();return true;}
   el("settings-button").addEventListener("click",()=>{loadForm();settingsDialog.showModal();});el("close-settings").addEventListener("click",()=>settingsDialog.close());wizardBack.addEventListener("click",()=>showStep(wizardStep-1));wizardNext.addEventListener("click",()=>{if(wizardStep===1&&fv("colour1")===fv("colour2")){statusEl.textContent="Choose two different piece colours.";return;}showStep(wizardStep+1);});wizardDefault.addEventListener("click",setDefaultForm);settingsForm.addEventListener("submit",e=>{e.preventDefault();commitSettings();});
   wizardIndicators.forEach((x,i)=>{x.setAttribute("role","button");x.tabIndex=0;x.addEventListener("click",()=>showStep(i));x.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();showStep(i);}});});
   settingsForm.querySelectorAll('[name="gameMode"]').forEach(x=>x.addEventListener("change",syncMode));el("difficulty-input").addEventListener("input",syncDifficulty);settingsForm.querySelectorAll('[name="clockMinutes"]').forEach(x=>x.addEventListener("change",syncClockOptions));

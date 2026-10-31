@@ -1,6 +1,6 @@
 {
   "name": "lipfty",
-  "version": "18.0.16",
+  "version": "18.0.17",
   "description": "Lipfty shared-piece strategy game",
   "private": true,
   "scripts": {
