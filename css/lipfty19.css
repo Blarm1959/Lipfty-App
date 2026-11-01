@@ -1,0 +1,13 @@
+/* v19: each player displays two independently earned qualification specials. */
+.qualification-row { gap:6px; }
+.qualification-row .qualification-token {
+  width:26px!important;
+  height:26px!important;
+  flex:0 0 26px;
+}
+.qualification-row .qualification-copy { flex:1 1 0; min-width:0; }
+@media (max-width:560px) {
+  .qualification-row { gap:5px; }
+  .qualification-row .qualification-token { width:23px!important; height:23px!important; flex-basis:23px; }
+  .qualification-rows { grid-template-columns:1fr; }
+}

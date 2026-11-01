@@ -13,6 +13,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/lipfty8-layout.css">
+  <link rel="stylesheet" href="css/lipfty19.css">
 </head>
 <body>
   <div class="app-shell">
@@ -47,17 +48,19 @@
           <p id="reserve-info" class="reserve-info"></p>
         </aside>
 
-        <section class="qualification-panel" aria-label="Move or Jump requirement" aria-live="polite">
-          <h2>Move / Jump requirement</h2>
-          <p class="qualification-help">Your first Move or Jump qualifies you to win. Your held corner piece returns automatically after the compulsory placements.</p>
+        <section class="qualification-panel" aria-label="Move and Jump requirements" aria-live="polite">
+          <h2>Move AND Jump requirements</h2>
+          <p class="qualification-help">Complete both a Move and a Jump to win. Blue returns after your first Move; Red after your first Jump.</p>
           <div class="qualification-rows">
             <div class="qualification-row" id="qualification-row-0">
-              <span class="piece piece--special qualification-token qualification-token--unassigned" id="qualification-piece-0" aria-hidden="true"></span>
-              <span class="qualification-copy"><strong id="qualification-name-0">Player</strong><small id="qualification-status-0">First colour not yet chosen</small></span>
+              <span class="piece piece--special qualification-token" id="qualification-move-piece-0" aria-hidden="true"></span>
+              <span class="piece piece--special qualification-token" id="qualification-jump-piece-0" aria-hidden="true"></span>
+              <span class="qualification-copy"><strong id="qualification-name-0">Player</strong><small id="qualification-status-0">Blue Move needed · Red Jump needed</small></span>
             </div>
             <div class="qualification-row" id="qualification-row-1">
-              <span class="piece piece--special qualification-token qualification-token--unassigned" id="qualification-piece-1" aria-hidden="true"></span>
-              <span class="qualification-copy"><strong id="qualification-name-1">Computer</strong><small id="qualification-status-1">First colour not yet chosen</small></span>
+              <span class="piece piece--special qualification-token" id="qualification-move-piece-1" aria-hidden="true"></span>
+              <span class="piece piece--special qualification-token" id="qualification-jump-piece-1" aria-hidden="true"></span>
+              <span class="qualification-copy"><strong id="qualification-name-1">Computer</strong><small id="qualification-status-1">Blue Move needed · Red Jump needed</small></span>
             </div>
           </div>
         </section>
@@ -67,22 +70,22 @@
         <section class="board-section">
           <div class="board-frame">
             <div id="board" class="board" role="grid" aria-label="Lipfty eight by eight board with inner six by six playing area"></div>
-            <p class="board-note">Lipfty 18: complete one Move or Jump before you can win; your held corner returns automatically. Colours are shared; both players may move and jump again.</p>
+            <p class="board-note">Lipfty 19: complete a Move AND a Jump to win. Blue special = Move; Red special = Jump. All four outside corners start empty.</p>
           </div>
 
         </section>
 
         <aside class="rules-panel rules-panel--quick">
           <h2 id="quick-rules-title">Lipfty · Easy</h2>
-          <p id="quick-opening-rule"><strong>Start:</strong> the inner 6×6 is empty. Choose the first reserve colour for the opponent. They hold that colour’s outside corner piece; you hold the opposite colour. Both remain fixed after Accept/Take.</p>
-          <p><strong>Your turn:</strong> use the handed colour to <strong>Place</strong>, <strong>Move</strong> or <strong>Jump</strong>. You cannot win until you have completed a Move or Jump.</p>
+          <p id="quick-opening-rule"><strong>Start:</strong> the inner 6×6 is empty. Each player holds one Red Jump and one Blue Move special. Choose the first ordinary reserve colour for the opponent; the special pieces do not depend on that choice.</p>
+          <p><strong>Your turn:</strong> use the handed colour to <strong>Place</strong>, <strong>Move</strong> or <strong>Jump</strong>. You cannot win until you have completed both a Move AND a Jump.</p>
           <p id="quick-win-rule"><strong>Win:</strong> make four in a horizontal, vertical or diagonal line.</p>
           <p class="panel-help"><strong>?</strong> opens the complete Lipfty rules.</p>
         </aside>
 
           <div id="swap-box" class="decision-box opening-position-panel" hidden>
             <strong>Accept the first placement or take the position?</strong>
-            <p>The first piece stays on the board. Accept to take your normal turn, or Take position to make the first player continue. Your special corner colour does not change.</p>
+            <p>The first piece stays on the board. Accept to take your normal turn, or Take position to make the first player continue. Everyone keeps their Red Jump and Blue Move specials.</p>
             <div><button id="carry-on" class="button button--secondary" type="button">Accept</button><button id="swap-sides" class="button button--primary" type="button">Take position</button></div>
           </div>
           <div id="jump-choice-box" class="decision-box" hidden>
@@ -96,7 +99,7 @@
       <section class="action-bar">
         <div class="action-bar-left"><button class="button button--secondary" id="new-game" type="button">New game</button></div>
         <div class="action-bar-centre"><button class="button button--secondary" id="undo" type="button">Undo</button></div>
-        <div class="build-info"><span id="app-version">Version 18.0.17</span><span id="build-reference"></span></div>
+        <div class="build-info"><span id="app-version">Version 19.0.1</span><span id="build-reference"></span></div>
       </section>
     </main>
   </div>
@@ -183,21 +186,21 @@
   <dialog id="statistics-dialog"><div class="dialog-heading"><div><p class="dialog-eyebrow">Lipfty</p><h2>Statistics</h2></div><button class="dialog-close" id="close-statistics" type="button">×</button></div><div id="statistics-content" class="statistics-content"></div><div class="dialog-actions"><button class="button button--secondary" id="reset-statistics" type="button">Reset statistics</button></div></dialog>
 
   <dialog id="help-dialog"><div class="dialog-heading"><div><p class="dialog-eyebrow">How to play</p><h2>Lipfty</h2></div><button class="dialog-close" id="close-help" type="button" aria-label="Close">×</button></div><div class="rules-copy"><p><a href="Lipfty-Rules.pdf" target="_blank" rel="noopener">Printable rules (PDF)</a> · <a href="Lipfty-Rules.md" target="_blank" rel="noopener">Rules source (Markdown)</a></p>
-    <p><strong>Objective.</strong> After you have completed at least one Move or Jump, make four of either shared colour in a horizontal, vertical or diagonal line (Easy). Standard also allows tight 2×2 squares. Larger spaced squares do not win. All other rules are identical and your opponent need not have qualified.</p>
-    <p><strong>Setup.</strong> All 36 squares of the inner 6×6 begin empty. Place 24 ordinary reserves (12 of each colour) around the non-corner outside edges and four shaped specials (two per colour) on the four outside corners. The starting chooser picks the first ordinary reserve colour for the opponent, who becomes the first placer. That colour also fixes the opponent’s held special; the chooser automatically holds the opposite-colour special. The other two specials remain on the outer corners. Neither player makes a separate special-piece choice.</p>
-    <p><strong>First placement.</strong> The opponent places the first ordinary piece of the chosen colour. The chooser then selects Accept or Take position. The first piece stays where placed and both players keep their already-assigned held special colours, regardless of the decision. When the computer makes this decision, a popup explains the result; press OK to continue. Subsequent ordinary colours remain opponent-selected.</p>
-    <p><strong>Normal play.</strong> The opponent selects an ordinary reserve piece. Place it, Move an unpinned board piece of that colour one adjacent square or Jump over one adjacent opposite-colour unpinned piece. Your first successful Move/Jump qualifies you to win. After its compulsory placements, the game automatically returns your held special to an empty outside corner. You may Move and Jump again freely. A winning Move/Jump ends the game immediately and automatically returns your earned special.</p>
-    <p><strong>Move consequence.</strong> The opponent chooses and places another ordinary reserve piece; the mover places the exact held piece. A Move requires another ordinary reserve besides the held piece. When either ordinary reserve colour runs out, both Move and Jump become unavailable and turns are Place-only.</p>
+    <p><strong>Objective.</strong> After you have completed both a Move and a Jump, make four of either shared colour in a horizontal, vertical or diagonal line (Easy). Standard also allows tight 2×2 squares. Larger spaced squares do not win. All other rules are identical and your opponent need not have qualified.</p>
+    <p><strong>Setup.</strong> The inner 6×6 starts empty. Place 24 ordinary reserves around the outside edges. Each player starts holding one Red special (Jump) and one Blue special (Move), leaving all four outside corners empty. The opening colour chooser chooses an ordinary colour for the first placer; that colour does not assign special pieces.</p>
+    <p><strong>First placement.</strong> The opponent places the first ordinary piece of the chosen colour. The chooser then selects Accept or Take position. The first piece stays where placed; both players retain their Red Jump and Blue Move specials. When the computer makes this decision, a popup explains the result; press OK to continue. Subsequent ordinary colours remain opponent-selected.</p>
+    <p><strong>Normal play.</strong> The opponent selects an ordinary reserve colour. You may Place, Move an unpinned board piece of that colour by one adjacent cell, or Jump over an adjacent unpinned piece of the opposite colour into an empty cell. Your first Move earns your Blue special and your first Jump earns your Red special, in either order. Both are essential for winning. The earned special returns automatically after all compulsory placements (or immediately if the action ends the game).</p>
+    <p><strong>Move consequence.</strong> The opponent chooses and places another ordinary reserve piece; the mover places the exact held piece. A Move requires another ordinary reserve besides the held piece. Move and Jump remain legal when one ordinary reserve colour runs out, as long as the selected action is otherwise legal.</p>
     <p><strong>Jump consequence.</strong> The opponent chooses and places either the exact held piece or exact jumped piece; the jumper places the other. Final Four pieces are not used during compulsory placements.</p>
-    <p><strong>Deadline and Final Four.</strong> After compulsory placements are finished, if either ordinary reserve colour runs out and one player has not qualified, that player loses. If neither qualified, the initial ordinary placer loses. Otherwise Move/Jump ends at this one-colour cutoff, and the remaining ordinary pieces are Place-only. Once all ordinary pieces are used, the four outside specials enter the 6×6 one at a time and become permanently pinned on placement. If they are all used without a winner, the game is a draw.</p>
-    <p><strong>Wins and protection.</strong> A four-piece pattern wins only if the acting player has already completed a Move or Jump, including the action currently being performed. A win cancels all remaining compulsory placements. The moved/jumped piece is temporarily protected, as in v17.</p>
+    <p><strong>Deadline and Final Four.</strong> Keep Move and Jump available while ordinary reserves remain, subject to the usual legal restrictions. After the final ordinary reserve is placed, only a player who has completed both actions can win by opponent qualification failure. If neither player qualified, there is no winner. If both qualified, play the four returned outside corner specials as pinned Final Four pieces.</p>
+    <p><strong>Wins and protection.</strong> A four-piece pattern wins only if the acting player has completed both Move and Jump, including the action currently being performed. A win cancels all remaining compulsory placements. The moved/jumped piece is temporarily protected, as in v17.</p>
     <p><strong>Continuing.</strong> New game starts a fresh game with the reserves and corners reset. Applying Settings also starts a new game. Clocks reset; individual-game statistics are retained.</p>
     <p><strong>Computer play speed.</strong> In Settings choose Immediate, 1, 2 or 3 seconds (2 seconds by default). Each computer board action, including each compulsory placement, is delayed separately. Human actions are not delayed. The clock and Undo otherwise work as before.</p>
-    <p><strong>Clock and Undo.</strong> Time expiry loses. Undo restores position, clock and statistics and returns to a human decision against the computer.</p>
+    <p><strong>Clock and Undo.</strong> Time expiry ends the game; under the v19 qualification rule an opponent who has not completed both actions does not receive a victory. Undo restores position, clock and statistics and returns to a human decision against the computer.</p>
   </div></dialog>
 
-  <script src="js/rules.js?v=18.0.17"></script>
-  <script src="js/app.js?v=18.0.17"></script>
+  <script src="js/rules.js?v=19.0.1"></script>
+  <script src="js/app.js?v=19.0.1"></script>
 </body>
 </html>
 

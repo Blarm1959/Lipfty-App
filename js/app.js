@@ -4,7 +4,7 @@
   // This is the version of the JavaScript actually running in this tab.
   // Build-info can update while an old tab stays open, so never use that
   // separate file as evidence that the currently executing code is new.
-  const APP_CODE_VERSION = "18.0.17";
+  const APP_CODE_VERSION = "19.0.1";
   function isNewerPublishedVersion(published) {
     if (typeof published !== "string" || !/^\d+\.\d+\.\d+$/.test(published)) return false;
     const currentParts = APP_CODE_VERSION.split(".").map(Number);
@@ -163,6 +163,15 @@
     // v18.0.12 experimental opening: every inner square starts empty.
     // The four shaped outside specials remain available for qualification and Final Four.
     const board=Array(36).fill(null);
+    // One Blue Move and one Red Jump special per player. Corners start empty.
+    const red=CORNERS.filter(i=>reserve.locked[i]==="black");
+    const blue=CORNERS.filter(i=>reserve.locked[i]==="white");
+    if(red.length!==2||blue.length!==2)throw Error("Invalid four-special setup");
+    const heldRequirements=[0,1].map(()=>({
+      move:{colour:"white",source:blue.pop()},
+      jump:{colour:"black",source:red.pop()}
+    }));
+    CORNERS.forEach(i=>reserve.locked[i]=null);
     return {
       phase: "main",
       board,
@@ -179,7 +188,10 @@
       colourChooser: starter,
       openingChooser: starter,
       firstPlacer: other(starter),
-      heldCorners: [null,null],
+      heldCorners: [null,null], // obsolete v18 compatibility slot
+      heldRequirements,
+      completedRequirements: [{move:false,jump:false},{move:false,jump:false}],
+      pendingReturnKind:null,
       qualificationCornerColours: [null,null],
       qualified: [false,false],
       pendingReturnPlayer: null,
@@ -211,6 +223,10 @@
       releasedCorners: [...s.releasedCorners], clearedEdges: [...s.clearedEdges],
       openingRemaining: {...s.openingRemaining},
       heldCorners: s.heldCorners.map(c => c ? {...c} : null),
+      heldRequirements: s.heldRequirements.map(x=>({
+        move:x.move?{...x.move}:null,jump:x.jump?{...x.jump}:null
+      })),
+      completedRequirements: s.completedRequirements.map(x=>({...x})),
       qualificationCornerColours: [...s.qualificationCornerColours],
       qualified: [...s.qualified],
       legalMoves: new Set(s.legalMoves), legalJumps: new Map(s.legalJumps),
@@ -257,7 +273,7 @@
   function reserveCount(colour) { return activeReserveIndices(colour).length; }
   function reserveTotal() { return activeReserveIndices().length; }
   function reserveColourCount() { return ["black","white"].filter(c => reserveCount(c) > 0).length; }
-  function placementOnlyNow() { return state.finalFourPhase || (reserveTotal()>0 && reserveColourCount()===1 && !state.consequence && !state.redeployPiece); }
+  function placementOnlyNow() { return state.finalFourPhase; }
 
   function blockedAnchors() { return []; }
 
@@ -274,18 +290,17 @@
   // opponent wins during its compulsory continuation. An immediate win ends
   // the continuation, so resolve the earned return before showing Game over.
   function settleEarnedCornerOnGameEnd() {
-    for (const player of [0,1]) {
-      if (!state.qualified[player] || !state.heldCorners[player]) continue;
-      if (state.pendingReturnPlayer !== player) continue;
-      if (!putHeldCorner(player, firstEmptyCorner()))
-        throw new Error("No vacant outside corner for earned return");
+    if(state.pendingReturnPlayer!==null){
+      if(!putHeldCorner(state.pendingReturnPlayer,firstEmptyCorner(),state.pendingReturnKind))
+        throw Error("No empty outside corner for earned special");
     }
-    state.pendingReturnPlayer = null;
+    state.pendingReturnPlayer=null;
+    state.pendingReturnKind=null;
   }
 
   function finishWin() {
     const w = R.checkWin(state.board, ruleOptions());
-    // A four-piece pattern wins only after its maker has Move/Jump-qualified.
+    // A four-piece pattern wins only when the acting player has earned BOTH requirements.
     if (!w || !state.qualified[state.currentPlayer]) return false;
     settleEarnedCornerOnGameEnd();
     state.winner = state.currentPlayer;
@@ -303,29 +318,33 @@
     return CORNERS.find(index => !state.reserve.locked[index]);
   }
 
-  function putHeldCorner(player, index) {
-    const held = state.heldCorners[player];
-    if (!held || !CORNERS.includes(index) || state.reserve.locked[index]) return false;
-    state.reserve.locked[index] = held.colour;
-    state.qualificationCornerColours[player] = held.colour;
-    state.heldCorners[player] = null;
+  function putHeldCorner(player,index,kind=state.pendingReturnKind) {
+    const held=state.heldRequirements[player]?.[kind];
+    if(!held||!CORNERS.includes(index)||state.reserve.locked[index])return false;
+    state.reserve.locked[index]=held.colour;
+    state.heldRequirements[player][kind]=null;
     return true;
   }
 
   function finishQualificationForfeit() {
-    const missing = state.qualified.map((ok,p)=>ok?null:p).filter(p=>p!==null);
-    if (!missing.length) return false;
-    // If neither player qualified, the first ordinary placer loses.
-    const loser = missing.length===2 ? state.firstPlacer : missing[0];
+    // Called at the exhaustion of BOTH ordinary reserve colours only.
+    const missing=state.qualified.map((ok,p)=>ok?null:p).filter(p=>p!==null);
+    if(!missing.length)return false;
     settleEarnedCornerOnGameEnd();
-    state.winner = other(loser);
-    state.winType = "qualification";
-    state.choosingColour = false;
-    state.pendingReturnPlayer = null;
-    state.consequence = null;
-    state.redeployPiece = null;
+    if(missing.length===2){
+      state.winType="double-qualification";
+      finishDraw();
+      return true;
+    }
+    state.winner=other(missing[0]);
+    state.winType="qualification";
+    state.choosingColour=false;
+    state.pendingReturnPlayer=null;
+    state.pendingReturnKind=null;
+    state.consequence=null;
+    state.redeployPiece=null;
     clearSelection();
-    stopClock(); maybeRecordResult(); playTone("win"); render(); maybeOfferUpdate();
+    stopClock();maybeRecordResult();playTone("win");render();maybeOfferUpdate();
     return true;
   }
 
@@ -386,19 +405,7 @@
     state.selectedReserveIndex = candidates[Math.floor(Math.random() * candidates.length)];
     state.assignedColour = colour;
     state.choosingColour = false;
-    // First colour determines both players' qualification specials, without
-    // any additional corner-pick decision. The ordinary piece still belongs
-    // to the first placer even if Accept/Take changes who plays next.
-    if (!state.swapDone && state.heldCorners.every(piece=>piece===null)) {
-      const opposite = colour === "black" ? "white" : "black";
-      for (const [player, specialColour] of [[state.firstPlacer,colour],[state.openingChooser,opposite]]) {
-        const source = CORNERS.find(i=>state.reserve.locked[i]===specialColour);
-        if (source === undefined) throw new Error("Missing opening qualification special: "+specialColour);
-        state.heldCorners[player] = {colour:specialColour,source};
-        state.qualificationCornerColours[player] = specialColour;
-        state.reserve.locked[source] = null;
-      }
-    }
+    // v19 distributes all four specials at the start of the game.
     render(); processFlow();
   }
 
@@ -412,16 +419,9 @@
     // Both human and computer return the held special automatically after
     // the Move/Jump's two compulsory placements. The first vacant corner is
     // deterministic, needs no further UI decision and preserves the four pieces.
-    if (state.pendingReturnPlayer !== null) {
-      const player = state.pendingReturnPlayer;
-      if (!putHeldCorner(player, firstEmptyCorner()))
-        throw new Error("No vacant outside corner for qualification return");
-      state.pendingReturnPlayer = null;
-    }
-    // Under v18 the first colour exhausted is the qualification deadline.
-    if (ordinaryReserveIndices().length < 24 &&
-        ["black","white"].some(colour=>ordinaryReserveIndices().every(i=>state.reserve.active[i]!==colour)) &&
-        finishQualificationForfeit()) return;
+    settleEarnedCornerOnGameEnd();
+    // v19: keep Move/Jump legal while any ordinary reserves remain.
+    if(ordinaryReserveIndices().length===0 && finishQualificationForfeit())return;
     state.phase = "main";
     state.currentPlayer = current;
     state.colourChooser = chooser;
@@ -617,9 +617,13 @@
     state.board[to] = piece;
     playTone(isJump ? "jump" : "move");
     clearSelection();
-    if (!state.qualified[state.currentPlayer]) {
-      state.qualified[state.currentPlayer] = true;
-      state.pendingReturnPlayer = state.currentPlayer;
+    const requirement=isJump?"jump":"move";
+    const flags=state.completedRequirements[state.currentPlayer];
+    if(!flags[requirement]){
+      flags[requirement]=true;
+      state.qualified[state.currentPlayer]=flags.move&&flags.jump;
+      state.pendingReturnPlayer=state.currentPlayer;
+      state.pendingReturnKind=requirement;
     }
     if (finishWin()) return;
 
@@ -747,8 +751,10 @@
   function actionWouldWin(action) {
     // The live game checks a Move/Jump win immediately after the moving piece
     // lands, before a jumped piece is removed. Mirror that exact timing here.
-    return (state.qualified[state.currentPlayer] || action.type !== "place") &&
-      !!R.checkWin(boardAfterAction(action, false), winOptions(actionInactiveWinCells(action)));
+    const flags=state.completedRequirements[state.currentPlayer];
+    const earnsOther=(action.type==="move"&&flags.jump)||(action.type==="jump"&&flags.move);
+    return (state.qualified[state.currentPlayer]||earnsOther) &&
+      !!R.checkWin(boardAfterAction(action,false),winOptions(actionInactiveWinCells(action)));
   }
 
   function enumerateComputerActions() {
@@ -775,7 +781,8 @@
     if (action.type === "jump") score += 2;
     else if (action.type === "move") score += 1;
     // Being able to win at all is worth far more than cosmetic pattern score.
-    if (!state.qualified[state.currentPlayer] && action.type !== "place") score += 28000;
+    const flags=state.completedRequirements[state.currentPlayer];
+    if((action.type==="move"||action.type==="jump")&&!flags[action.type])score+=28000;
 
     // A pattern made by a non-qualified player is not a victory.
     if (!state.qualified[state.currentPlayer] && action.type === "place" &&
@@ -970,7 +977,7 @@
 
   // Report only genuinely legal board actions for the currently handed colour.
   // This mirrors selectBoardPiece() and enumerateComputerActions(), including
-  // the extra reserve needed for Move and the one-colour cutoff.
+  // the extra reserve needed for Move and the end of the ordinary reserve phase.
   function currentBoardActions() {
     const options = [];
     if (!state.choosingColour && !state.redeployPiece && state.board.some(piece=>!piece) &&
@@ -1003,9 +1010,12 @@
       + (remaining ? ` COMPULSORY PLACEMENT: ${remaining} remaining.` : "");
   }
   function turnStatusText() {
-    if (state.winner === "draw") return "Draw — no playable reserve piece remains without a win.";
+    if (state.winner === "draw") return state.winType==="double-qualification"
+      ? "Neither player completed both Move and Jump. No winner."
+      : state.winType==="time-unqualified" ? "Clock expired. Neither player eligible to win."
+      : "Draw — no playable reserve piece remains without a win.";
     if (state.winner !== null) {
-      if (state.winType === "qualification") return `${playerName(state.winner)} wins: opponent did not complete a Move or Jump before a reserve colour ran out.`;
+      if (state.winType === "qualification") return `${playerName(state.winner)} wins: opponent did not complete both Move and Jump before all ordinary reserves ran out.`;
       if (state.winType === "time") return `${playerName(state.winner)} wins on time.`;
       return `${playerName(state.winner)} wins${state.winType === "square" ? " with a square" : " with four in a row"}.`;
     }
@@ -1015,17 +1025,17 @@
       return `${playerName(state.currentPlayer)}: place the ${colourName(state.assignedColour)} Opening Four piece on any empty 6×6 corner.`;
     }
     if (state.consequence?.type === "jump-choice" && state.choosingColour) {
-      const firstJump = state.pendingReturnPlayer === state.consequence.jumper;
-      return `${playerName(state.currentPlayer)}: choose which piece to place after ${playerName(state.consequence.jumper)}'s Jump. Both compulsory placements must be completed.${firstJump ? " Their held corner then returns automatically." : ""}`;
+      const firstJump = state.pendingReturnPlayer === state.consequence.jumper && state.pendingReturnKind === "jump";
+      return `${playerName(state.currentPlayer)}: choose which piece to place after ${playerName(state.consequence.jumper)}'s Jump. Both compulsory placements must be completed.${firstJump ? " Their Red Jump special then returns automatically." : ""}`;
     }
     if (state.consequence?.type === "move" && state.consequence.step === 1 && state.choosingColour) {
-      const firstMove = state.pendingReturnPlayer === state.consequence.mover;
-      return `${playerName(state.currentPlayer)}: after ${playerName(state.consequence.mover)}'s Move, choose a reserve piece for your compulsory placement.${firstMove ? " Their held corner returns after both compulsory placements." : ""}`;
+      const firstMove = state.pendingReturnPlayer === state.consequence.mover && state.pendingReturnKind === "move";
+      return `${playerName(state.currentPlayer)}: after ${playerName(state.consequence.mover)}'s Move, choose a reserve piece for your compulsory placement.${firstMove ? " Their Blue Move special returns after both compulsory placements." : ""}`;
     }
     if (state.choosingColour && state.finalFourPhase) return `${playerName(state.currentPlayer)}: choose a Final Four corner piece to place. No Move or Jump.`;
     if (state.choosingColour) return ordinaryReserveIndices(state.consequence?.heldIndex).length
       ? !state.swapDone && state.heldCorners.every(piece=>piece===null)
-        ? `${playerName(state.colourChooser)}: choose the first colour for ${playerName(state.firstPlacer)}. Their special will match; yours will be the opposite colour.`
+        ? `${playerName(state.colourChooser)}: choose the first colour for ${playerName(state.firstPlacer)}. Both players already hold one Red Jump and one Blue Move special.`
         : `${playerName(state.colourChooser)}: choose a reserve piece/colour for ${playerName(state.currentPlayer)}.`
       : "No ordinary reserve piece remains.";
     if (state.redeployPiece) return `${playerName(state.currentPlayer)}: place the jumped ${colourName(state.redeployPiece.colour)} piece on any empty square.`;
@@ -1107,7 +1117,7 @@
           }
         } else if (locked) {
           btn.appendChild(renderPiece(locked,true,true));
-          btn.title="Locked corner — clear either adjoining edge to release it";
+          btn.title="Returned special — reserved until Final Four";
         } else btn.classList.add("empty-reserve");
         if (slot>=0 && state.releasedCorners[slot]) btn.classList.add("released-corner");
       } else {
@@ -1137,19 +1147,27 @@
   }
 
   function renderQualificationPanel() {
-    for (let player=0;player<2;player++) {
-      const held = state.heldCorners[player];
-      const colour = state.qualificationCornerColours[player] || held?.colour || null;
-      const completed = !!state.qualified[player];
-      const returned = completed && !held;
-      const token = el(`qualification-piece-${player}`);
-      token.className = `piece piece--special qualification-token ${colour ? `piece--${colour}` : "qualification-token--unassigned"}${completed ? " qualification-token--returned" : ""}${returned ? " qualification-token--corner-returned" : ""}`;
-      el(`qualification-name-${player}`).textContent = playerName(player);
-      el(`qualification-status-${player}`).textContent = returned
-        ? `${colour ? colourName(colour) + " · " : ""}Corner returned — ready to win ✓`
-        : completed
-          ? "Move/Jump complete — corner return pending"
-          : held ? `${colourName(held.colour)} · Move/Jump needed` : "First colour not yet chosen";
+    for(let player=0;player<2;player++){
+      const flags=state.completedRequirements[player];
+      const held=state.heldRequirements[player];
+      el("qualification-name-"+player).textContent=playerName(player);
+      for(const [kind,colour,label,hex] of [
+        ["move","white","Blue Move","#2d65ad"],
+        ["jump","black","Red Jump","#d6423a"]
+      ]){
+        const token=el("qualification-"+kind+"-piece-"+player);
+        const returned=flags[kind]&&!held[kind];
+        token.className="piece piece--special qualification-token piece--"+colour+
+          (flags[kind]?" qualification-token--returned":"")+
+          (returned?" qualification-token--corner-returned":"");
+        token.style.backgroundColor=colourCss(colour);
+        token.title=label+(returned?" earned and returned":flags[kind]?" return pending":" needed");
+      }
+      const desc=[
+        colourName("white")+" Move "+(flags.move?(held.move?"earned, return pending":"✓"):"needed"),
+        colourName("black")+" Jump "+(flags.jump?(held.jump?"earned, return pending":"✓"):"needed")
+      ].join(" · ");
+      el("qualification-status-"+player).textContent=desc+(state.qualified[player]?" — ready to win":"");
     }
   }
 
@@ -1163,8 +1181,8 @@
     const versionTitle = settings.version === "medium" ? "Standard" : "Easy";
     el("quick-rules-title").textContent = `Lipfty · ${versionTitle}`;
     el("quick-win-rule").innerHTML = settings.version === "medium"
-      ? "<strong>Win:</strong> Move/Jump first, then four in a line or tight 2×2 square."
-      : "<strong>Win:</strong> Move/Jump first, then four in a line.";
+      ? "<strong>Win:</strong> Complete a Move AND a Jump, then four in a line or tight 2×2 square."
+      : "<strong>Win:</strong> Complete a Move AND a Jump, then four in a line.";
     blackBtn.querySelector("strong").textContent=colourName("black");
     whiteBtn.querySelector("strong").textContent=colourName("white");
     const excludeHeld = state.consequence?.type === "move" ? state.consequence.heldIndex : null;
@@ -1202,12 +1220,12 @@
     }
 
     reserveInfoEl.textContent = state.pendingSwap
-      ? "Accept the first placement or Take position. Your Move/Jump corner colour stays fixed either way."
+      ? "Accept the first placement or Take position. Both players retain their Red Jump and Blue Move specials."
       : state.phase === "opening"
       ? "Two same-colour special pieces at each outside corner. The chosen top piece flashes; dots mark where it can be placed."
       : state.redeployPiece ? `Place the jumped ${colourName(state.redeployPiece.colour)} piece on a dotted square.`
       : state.finalFourPhase ? "Final Four: choose a shaped corner piece and place it. No Move or Jump."
-      : "Complete one Move or Jump before you can win. Your special piece returns after its compulsory placements. The top message shows which actions are currently legal.";
+      : "Complete a Move AND a Jump before you can win. Each earned special returns after its compulsory placements. The top message shows the currently legal actions.";
 
     swapBox.hidden = !state.pendingSwap || isComputer(state.pendingSwap?.decider);
     jumpChoiceBox.hidden = !(state.consequence?.type === "jump-choice" && state.choosingColour && !isComputer(state.colourChooser));
@@ -1221,9 +1239,9 @@
   }
 
   function gameIsInProgress(){
-    // Starting board is empty; untouched reserve and no owned specials mean no play yet.
+    // The starting board is empty and both players hold two specials before any turn.
     return !!state && state.winner === null && (
-      state.swapDone || state.heldCorners.some(Boolean) || state.qualified.some(Boolean) ||
+      state.swapDone || state.completedRequirements.some(f=>f.move||f.jump) ||
       ordinaryReserveIndices().length < 24 || state.consequence !== null);
   }
 
@@ -1262,7 +1280,11 @@
   function finishTimeLoss(expired){
     if(!state || state.winner!==null) return;
     settleEarnedCornerOnGameEnd();
-    clockRemainingMs[expired]=0; state.winner=other(expired); state.winType="time"; state.choosingColour=false;
+    clockRemainingMs[expired]=0;
+    const remaining=other(expired);
+    state.winner=state.qualified[remaining]?remaining:"draw";
+    state.winType=state.winner==="draw"?"time-unqualified":"time";
+    state.choosingColour=false;
     if(clockInterval) clearInterval(clockInterval); clockInterval=null; clockActivePlayer=null; clockLastTick=null;
     maybeRecordResult(); playTone("win"); render(); maybeOfferUpdate();
   }
