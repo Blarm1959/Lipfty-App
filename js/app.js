@@ -4,7 +4,7 @@
   // This is the version of the JavaScript actually running in this tab.
   // Build-info can update while an old tab stays open, so never use that
   // separate file as evidence that the currently executing code is new.
-  const APP_CODE_VERSION = "19.0.3";
+  const APP_CODE_VERSION = "19.0.4";
   function isNewerPublishedVersion(published) {
     if (typeof published !== "string" || !/^\d+\.\d+\.\d+$/.test(published)) return false;
     const currentParts = APP_CODE_VERSION.split(".").map(Number);
@@ -299,10 +299,50 @@
     state.pendingReturnKind=null;
   }
 
+  // EXPERIMENTAL ONLY: a normal winning formation is illegal while either
+  // special is still held, or while the second return is pending.
+  function bothSpecialsReturned(player=state.currentPlayer) {
+    const held=state.heldRequirements[player];
+    return state.qualified[player] && !held.move && !held.jump &&
+      state.pendingReturnPlayer !== player;
+  }
+  // Every new line/square must contain the action's previously EMPTY landing
+  // square. Pre-index those shapes once instead of searching every pattern
+  // for every candidate AI action (important on mobile hardware).
+  const WINNING_PATTERNS_AT = (() => {
+    const lines=Array.from({length:36},()=>[]);
+    const standard=Array.from({length:36},()=>[]);
+    for(const pattern of [...R.ORTHOGONAL_LINES,...R.DIAGONAL_LINES])
+      for(const i of pattern){lines[i].push(pattern);standard[i].push(pattern);}
+    for(const pattern of R.TIGHT_SQUARES)
+      for(const i of pattern)standard[i].push(pattern);
+    return {lines,standard};
+  })();
+  function createsNewPattern(action) {
+    const {to,from,over,type}=action;
+    if(!Number.isInteger(to)||to<0||to>=36||state.board[to])return false;
+    const colour=type==='place'
+      ? (action.colour||state.redeployPiece?.colour||state.assignedColour)
+      : state.board[from]?.colour;
+    if(!colour)return false;
+    const patterns=settings.version==='medium'
+      ? WINNING_PATTERNS_AT.standard[to] : WINNING_PATTERNS_AT.lines[to];
+    // For a Jump, the jumped piece is removed before testing the completed
+    // board. Removing a piece cannot create a line, but may break one.
+    return patterns.some(pattern=>pattern.every(i=>i===to || (
+      i!==from && !(type==='jump'&&i===over) && state.board[i]?.colour===colour
+    )));
+  }
+  function forbiddenPatternAction(action,player=state.currentPlayer) {
+    return !bothSpecialsReturned(player)&&createsNewPattern(action);
+  }
+  function legalEmptySquares(colour=state.redeployPiece?.colour||state.assignedColour) {
+    return state.board.map((p,to)=>!p&&!forbiddenPatternAction({type:'place',to,colour})?to:null).filter(to=>to!==null);
+  }
   function finishWin() {
     const w = R.checkWin(state.board, ruleOptions());
-    // A four-piece pattern wins only when the acting player has earned BOTH requirements.
-    if (!w || !state.qualified[state.currentPlayer]) return false;
+    // BOTH corners must have physically returned before an ordinary pattern can win.
+    if (!w || !bothSpecialsReturned(state.currentPlayer)) return false;
     settleEarnedCornerOnGameEnd();
     state.winner = state.currentPlayer;
     state.winningCells = [...w.line];
@@ -327,6 +367,35 @@
     return true;
   }
 
+  // Research candidate: failure to complete a mandatory legal action is a loss.
+  // This special forfeit overrides normal qualification: the opponent wins
+  // even if the opponent has not returned both corners.
+  function finishIllegalActionForfeit() {
+    if (state.winner!==null)return false;
+    settleEarnedCornerOnGameEnd();
+    state.winner=other(state.currentPlayer);
+    state.winType='illegal-action-forfeit';
+    state.choosingColour=false;
+    state.consequence=null;
+    state.redeployPiece=null;
+    state.pendingReturnPlayer=null;
+    state.pendingReturnKind=null;
+    clearSelection();
+    stopClock();maybeRecordResult();playTone('win');render();maybeOfferUpdate();
+    return true;
+  }
+  function noLegalBoardAction() {
+    if (!state||state.winner!==null||state.phase!=='main'||state.pendingSwap||state.choosingColour)return false;
+    // Count actual legal destinations for fixed-colour compulsory placement.
+    if (state.redeployPiece) return legalEmptySquares(state.redeployPiece.colour).length===0;
+    if (state.selectedReserveIndex===null) return false;
+    if (legalEmptySquares(state.assignedColour).length)return false;
+    // A voluntary ordinary turn can instead perform any legal Move or Jump.
+    if (!state.consequence && canMoveOrJump())
+      return !state.board.some((piece,i)=>piece &&
+        (boardPieceOptions(i).moves.length||boardPieceOptions(i).jumps.length));
+    return true;
+  }
   function finishQualificationForfeit() {
     // Called at the exhaustion of BOTH ordinary reserve colours only.
     const missing=state.qualified.map((ok,p)=>ok?null:p).filter(p=>p!==null);
@@ -519,6 +588,10 @@
 
   function placePiece(index) {
     if (state.winner !== null || state.choosingColour || state.board[index]) return;
+    if(forbiddenPatternAction({type:'place',to:index})) {
+      state.boardSelectionNotice='Illegal: you must return both specials before completing four in a line or square.';
+      render(); return;
+    }
     checkpoint();
     state.positionDecisionMessage = "";
 
@@ -601,11 +674,13 @@
     if (!piece || !canMoveOrJump() || state.choosingColour || state.winner !== null ||
         piece.colour !== state.assignedColour || piece.pinned ||
         piece.id === state.protectedPieceId) return { moves: [], jumps: [] };
-    const moves = activeReserveIndices(null, state.selectedReserveIndex).length
-      ? R.adjacentDestinations(state.board, index) : [];
+    const moves = (activeReserveIndices(null, state.selectedReserveIndex).length
+      ? R.adjacentDestinations(state.board, index) : [])
+      .filter(to=>!forbiddenPatternAction({type:'move',from:index,to}));
     const jumps = R.jumpDestinations(state.board, index).filter(j =>
       state.board[j.over] && !state.board[j.over].pinned &&
-      state.board[j.over].colour !== piece.colour);
+      state.board[j.over].colour !== piece.colour &&
+      !forbiddenPatternAction({type:'jump',from:index,to:j.to,over:j.over}));
     return { moves, jumps };
   }
 
@@ -640,6 +715,10 @@
     const jump = state.legalJumps.get(to) || null;
     const isJump = !!jump;
     if (!state.legalMoves.has(to) && !isJump) return;
+    if(forbiddenPatternAction({type:isJump?'jump':'move',from,to,over:jump?.over})) {
+      state.boardSelectionNotice='Illegal: both special pieces must return before completing a four-piece pattern.';
+      render(); return;
+    }
     checkpoint();
     state.positionDecisionMessage = "";
     const piece = state.board[from];
@@ -655,6 +734,11 @@
       state.pendingReturnPlayer=state.currentPlayer;
       state.pendingReturnKind=requirement;
     }
+    // A Jump's result includes removing the jumped piece. Never evaluate an
+    // intermediate landing position as a completed or forbidden pattern.
+    const jumped = isJump ? state.board[jump.over] : null;
+    if (isJump && !jumped) return;
+    if (isJump) state.board[jump.over] = null;
     if (finishWin()) return;
 
     const heldIndex = state.selectedReserveIndex, heldColour = state.assignedColour;
@@ -668,9 +752,6 @@
       render(); processFlow(); return;
     }
 
-    const jumped = jump ? state.board[jump.over] : null;
-    if (!jumped) return;
-    state.board[jump.over] = null;
     state.consequence = { type:"jump-choice", jumper:mover, responder, heldIndex, heldColour, jumpedPiece:jumped, protectedPieceId:piece.id };
     state.currentPlayer = responder;
     state.colourChooser = responder;
@@ -779,12 +860,10 @@
   }
 
   function actionWouldWin(action) {
-    // The live game checks a Move/Jump win immediately after the moving piece
-    // lands, before a jumped piece is removed. Mirror that exact timing here.
-    const flags=state.completedRequirements[state.currentPlayer];
-    const earnsOther=(action.type==="move"&&flags.jump)||(action.type==="jump"&&flags.move);
-    return (state.qualified[state.currentPlayer]||earnsOther) &&
-      !!R.checkWin(boardAfterAction(action,false),winOptions(actionInactiveWinCells(action)));
+    // Only players with both returned specials can win. A Jump is
+    // evaluated after removing the jumped piece, just as in live play.
+    return bothSpecialsReturned() &&
+      !!R.checkWin(boardAfterAction(action,true),winOptions(actionInactiveWinCells(action)));
   }
 
   function enumerateComputerActions() {
@@ -792,7 +871,7 @@
     if (state.selectedReserveIndex !== null) {
       for (let to = 0; to < 36; to += 1) if (!state.board[to]) actions.push({ type:"place", to });
     }
-    if (!canMoveOrJump()) return actions;
+    if (!canMoveOrJump()) return actions.filter(a=>!forbiddenPatternAction(a));
     for (let from = 0; from < 36; from += 1) {
       const piece = state.board[from];
       if (!piece || piece.colour !== state.assignedColour || piece.pinned || piece.id === state.protectedPieceId) continue;
@@ -801,7 +880,7 @@
         .filter(j => state.board[j.over] && !state.board[j.over].pinned && state.board[j.over].colour !== piece.colour)
         .forEach(j => actions.push({ type:"jump", from, to:j.to, over:j.over }));
     }
-    return actions;
+    return actions.filter(a=>!forbiddenPatternAction(a));
   }
 
   function positionalActionScore(action, expert = false) {
@@ -814,9 +893,8 @@
     const flags=state.completedRequirements[state.currentPlayer];
     if((action.type==="move"||action.type==="jump")&&!flags[action.type])score+=28000;
 
-    // A pattern made by a non-qualified player is not a victory.
-    if (!state.qualified[state.currentPlayer] && action.type === "place" &&
-        R.checkWin(board, winOptions(inactive))) score -= 30000;
+    // The action list already excludes forbidden new patterns. Avoid
+    // scoring obsolete, disallowed formations as desirable outcomes.
     if (expert) {
       const risks = ["black","white"].map(colour => countImmediatePlacementWins(board, colour, inactive));
       // After an ordinary placement the computer will choose the opponent's
@@ -912,8 +990,8 @@
     }
 
     if (state.redeployPiece) {
-      const empties = state.board.map((piece,index) => piece ? null : index).filter(index => index !== null);
-      if (!empties.length) { finishDraw(); return; }
+      const empties = legalEmptySquares(state.redeployPiece.colour);
+      if (!empties.length) { finishIllegalActionForfeit(); return; }
       if (settings.level === "beginner") {
         placePiece(empties[Math.floor(Math.random()*empties.length)]);
         return;
@@ -934,7 +1012,11 @@
     }
 
     const actions = enumerateComputerActions();
-    if (!actions.length) { finishDraw(); return; }
+    if (!actions.length) {
+      if(noLegalBoardAction())finishIllegalActionForfeit();
+      else finishDraw();
+      return;
+    }
     if (settings.level === "beginner") {
       const action = actions[Math.floor(Math.random()*actions.length)];
       if (action.type === "place") placePiece(action.to);
@@ -988,6 +1070,8 @@
     // Resolve forced colour handovers before assigning the decision clock.
     // No checkpoint: Undo should return to a meaningful player decision.
     const automatic = autoChooseOnlyColour();
+    // A player cannot pass a compulsory turn when all destinations are illegal.
+    if(noLegalBoardAction()) { finishIllegalActionForfeit(); return; }
     syncClock();
     if (automatic) render();
     if (state.winner !== null) return;
@@ -1010,8 +1094,8 @@
   // the extra reserve needed for Move and the end of the ordinary reserve phase.
   function currentBoardActions() {
     const options = [];
-    if (!state.choosingColour && !state.redeployPiece && state.board.some(piece=>!piece) &&
-        state.selectedReserveIndex !== null) options.push("Place");
+    if (!state.choosingColour && !state.redeployPiece &&
+        state.selectedReserveIndex !== null && legalEmptySquares(state.assignedColour).length) options.push("Place");
     if (!canMoveOrJump() || state.choosingColour || !state.assignedColour) return options;
     let canMove = false, canJump = false;
     for (let index = 0; index < state.board.length; index++) {
@@ -1041,6 +1125,8 @@
       : state.winType==="time-unqualified" ? "Clock expired. Neither player eligible to win."
       : "Draw — no playable reserve piece remains without a win.";
     if (state.winner !== null) {
+      if (state.winType === "illegal-action-forfeit")
+        return `${playerName(state.winner)} wins: opponent could not make a legal required action.`;
       if (state.winType === "qualification") return `${playerName(state.winner)} wins: opponent did not complete both Move and Jump before all ordinary reserves ran out.`;
       if (state.winType === "time") return `${playerName(state.winner)} wins on time.`;
       return `${playerName(state.winner)} wins${state.winType === "square" ? " with a square" : " with four in a row"}.`;
@@ -1156,7 +1242,8 @@
         if (state.selectedBoardIndex===index) btn.classList.add("selected");
         if (state.legalMoves.has(index)) btn.classList.add("move-target");
         if (state.legalJumps.has(index)) btn.classList.add("jump-target");
-        if (state.winner === null && !state.pendingSwap && state.phase==="main" && !state.choosingColour && state.selectedBoardIndex === null && !state.board[index] && (state.selectedReserveIndex!==null || state.redeployPiece)) btn.classList.add("place-target");
+        if (state.winner === null && !state.pendingSwap && state.phase==="main" && !state.choosingColour && state.selectedBoardIndex === null && !state.board[index] && (state.selectedReserveIndex!==null || state.redeployPiece) &&
+            legalEmptySquares().includes(index)) btn.classList.add("place-target");
         const p=state.board[index];
         if (p) {
           // Make playable pieces distinguishable from the temporarily protected
@@ -1225,8 +1312,8 @@
     const versionTitle = settings.version === "medium" ? "Standard" : "Easy";
     el("quick-rules-title").textContent = `Lipfty · ${versionTitle}`;
     el("quick-win-rule").innerHTML = settings.version === "medium"
-      ? "<strong>Win:</strong> Complete a Move AND a Jump, then four in a line or tight 2×2 square."
-      : "<strong>Win:</strong> Complete a Move AND a Jump, then four in a line.";
+      ? "<strong>Win:</strong> Return both earned specials, then make four in a line or a tight 2×2 square. Forming four earlier is illegal."
+      : "<strong>Win:</strong> Return both earned specials, then make four in a line. Forming four earlier is illegal.";
     blackBtn.querySelector("strong").textContent=colourName("black");
     whiteBtn.querySelector("strong").textContent=colourName("white");
     const excludeHeld = state.consequence?.type === "move" ? state.consequence.heldIndex : null;
