@@ -4,7 +4,7 @@
   // This is the version of the JavaScript actually running in this tab.
   // Build-info can update while an old tab stays open, so never use that
   // separate file as evidence that the currently executing code is new.
-  const APP_CODE_VERSION = "19.0.1";
+  const APP_CODE_VERSION = "19.0.3";
   function isNewerPublishedVersion(published) {
     if (typeof published !== "string" || !/^\d+\.\d+\.\d+$/.test(published)) return false;
     const currentParts = APP_CODE_VERSION.split(".").map(Number);
@@ -199,6 +199,7 @@
       assignedColour: null,
       selectedReserveIndex: null,
       selectedBoardIndex: null,
+      boardSelectionNotice: "",
       legalMoves: new Set(),
       legalJumps: new Map(),
       protectedPieceId: null,
@@ -405,6 +406,7 @@
     state.selectedReserveIndex = candidates[Math.floor(Math.random() * candidates.length)];
     state.assignedColour = colour;
     state.choosingColour = false;
+    state.boardSelectionNotice = "";
     // v19 distributes all four specials at the start of the game.
     render(); processFlow();
   }
@@ -413,6 +415,7 @@
     state.selectedBoardIndex = null;
     state.legalMoves = new Set();
     state.legalJumps = new Map();
+    state.boardSelectionNotice = "";
   }
 
   function nextNormalTurn(current, chooser, protectedId = null) {
@@ -590,16 +593,43 @@
       !CORNERS.includes(state.selectedReserveIndex) && !placementOnlyNow();
   }
 
+  // This is shared by the human click handler, the visible selectable rings,
+  // and the advertised actions. A piece can never be shown as playable but
+  // silently rejected by a different legality check.
+  function boardPieceOptions(index) {
+    const piece = state.board[index];
+    if (!piece || !canMoveOrJump() || state.choosingColour || state.winner !== null ||
+        piece.colour !== state.assignedColour || piece.pinned ||
+        piece.id === state.protectedPieceId) return { moves: [], jumps: [] };
+    const moves = activeReserveIndices(null, state.selectedReserveIndex).length
+      ? R.adjacentDestinations(state.board, index) : [];
+    const jumps = R.jumpDestinations(state.board, index).filter(j =>
+      state.board[j.over] && !state.board[j.over].pinned &&
+      state.board[j.over].colour !== piece.colour);
+    return { moves, jumps };
+  }
+
   function selectBoardPiece(index) {
     if (!canMoveOrJump() || state.choosingColour || state.winner !== null) return;
-    const p = state.board[index];
-    if (!p || p.colour !== state.assignedColour || p.pinned || p.id === state.protectedPieceId) return;
+    const piece = state.board[index];
+    if (!piece) return;
     if (state.selectedBoardIndex === index) { clearSelection(); render(); return; }
+    const { moves, jumps } = boardPieceOptions(index);
+    if (!moves.length && !jumps.length) {
+      clearSelection();
+      state.boardSelectionNotice = piece.colour !== state.assignedColour
+        ? `Choose a ${colourName(state.assignedColour)} piece on the inner board, or Place the handed piece.`
+        : piece.pinned ? "Final Four pieces are fixed and cannot Move or Jump."
+        : piece.id === state.protectedPieceId
+        ? `That ${colourName(piece.colour)} piece is protected for this turn after the previous Move or Jump. Choose another highlighted piece or Place.`
+        : "This piece has no legal Move or Jump destination. Choose another highlighted piece or Place.";
+      render();
+      return;
+    }
+    clearSelection();
     state.selectedBoardIndex = index;
-    state.legalMoves = new Set(activeReserveIndices(null,state.selectedReserveIndex).length ? R.adjacentDestinations(state.board,index) : []);
-    state.legalJumps = new Map(R.jumpDestinations(state.board,index)
-      .filter(j => state.board[j.over] && !state.board[j.over].pinned && state.board[j.over].colour !== p.colour)
-      .map(j => [j.to,j]));
+    state.legalMoves = new Set(moves);
+    state.legalJumps = new Map(jumps.map(j => [j.to, j]));
     render();
   }
 
@@ -985,14 +1015,9 @@
     if (!canMoveOrJump() || state.choosingColour || !state.assignedColour) return options;
     let canMove = false, canJump = false;
     for (let index = 0; index < state.board.length; index++) {
-      const piece = state.board[index];
-      if (!piece || piece.pinned || piece.colour !== state.assignedColour ||
-          piece.id === state.protectedPieceId) continue;
-      if (!canMove && activeReserveIndices(null, state.selectedReserveIndex).length &&
-          R.adjacentDestinations(state.board,index).length) canMove = true;
-      if (!canJump && R.jumpDestinations(state.board,index).some(j =>
-        state.board[j.over] && !state.board[j.over].pinned &&
-        state.board[j.over].colour !== piece.colour)) canJump = true;
+      const options = boardPieceOptions(index);
+      if (options.moves.length) canMove = true;
+      if (options.jumps.length) canJump = true;
       if (canMove && canJump) break;
     }
     if (canMove) options.push("Move");
@@ -1007,7 +1032,8 @@
       : c.type === "move" ? (c.step === 1 ? 2 : 1)
       : ["jump-choice","jump-redeploy-first","jump-held-first"].includes(c.type) ? 2 : 1;
     return (explanation ? explanation + " " : "") + turnStatusText()
-      + (remaining ? ` COMPULSORY PLACEMENT: ${remaining} remaining.` : "");
+      + (remaining ? ` COMPULSORY PLACEMENT: ${remaining} remaining.` : "")
+      + (state.winner === null && state.boardSelectionNotice ? ` ${state.boardSelectionNotice}` : "");
   }
   function turnStatusText() {
     if (state.winner === "draw") return state.winType==="double-qualification"
@@ -1133,6 +1159,24 @@
         if (state.winner === null && !state.pendingSwap && state.phase==="main" && !state.choosingColour && state.selectedBoardIndex === null && !state.board[index] && (state.selectedReserveIndex!==null || state.redeployPiece)) btn.classList.add("place-target");
         const p=state.board[index];
         if (p) {
+          // Make playable pieces distinguishable from the temporarily protected
+          // piece. Keep protected pieces tappable so the player gets a reason,
+          // rather than an apparently broken click.
+          if (state.winner === null && !state.pendingSwap && !state.choosingColour &&
+              !isComputer(state.currentPlayer) && !state.consequence &&
+              !state.redeployPiece && p.colour === state.assignedColour) {
+            const options = boardPieceOptions(index);
+            if (options.moves.length || options.jumps.length) {
+              btn.classList.add("board-piece-selectable");
+              btn.setAttribute("aria-label", `Select ${colourName(p.colour)} piece to ${
+                options.moves.length && options.jumps.length ? "Move or Jump" :
+                options.jumps.length ? "Jump" : "Move"}`);
+            } else if (p.id === state.protectedPieceId) {
+              btn.classList.add("board-piece-protected");
+              btn.setAttribute("aria-label", `${colourName(p.colour)} piece, protected for this turn`);
+              btn.title = "Temporarily protected — cannot Move or Jump this turn";
+            }
+          }
           const boardPiece=renderPiece(p.colour,p.special);
           if (state.winner===null && state.pendingSwap?.firstNormalIndex===index) boardPiece.classList.add("piece--active-reserve");
           btn.appendChild(boardPiece);
