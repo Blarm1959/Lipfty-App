@@ -4,7 +4,7 @@
   // This is the version of the JavaScript actually running in this tab.
   // Build-info can update while an old tab stays open, so never use that
   // separate file as evidence that the currently executing code is new.
-  const APP_CODE_VERSION = "19.0.4";
+  const APP_CODE_VERSION = "19.0.5";
   function isNewerPublishedVersion(published) {
     if (typeof published !== "string" || !/^\d+\.\d+\.\d+$/.test(published)) return false;
     const currentParts = APP_CODE_VERSION.split(".").map(Number);
@@ -906,6 +906,196 @@
     return score;
   }
 
+  // v19.0.5 Expert: evaluate the *recipient's* options rather than only
+  // rewarding four-in-a-row progress. Ordinary colours belong to neither
+  // player, so handing an opponent a useful Jump is often a worse decision
+  // than making an immediate Move ourselves.
+  //
+  // These are bounded, one-turn tactical estimates, not exhaustive search.
+  // The production rules still decide legality and execute every action.
+  function expertFormsPattern(board, to, colour, from = -1, over = -1) {
+    const patterns = settings.version === "medium"
+      ? WINNING_PATTERNS_AT.standard[to] : WINNING_PATTERNS_AT.lines[to];
+    return patterns.some(pattern => pattern.every(i => i === to ||
+      (i !== from && i !== over && board[i]?.colour === colour)));
+  }
+
+  function expertLegalPlacements(board, colour, player) {
+    let count = 0, wins = 0;
+    const qualified = bothSpecialsReturned(player);
+    for (let to = 0; to < 36; to++) {
+      if (board[to]) continue;
+      const makesFour = expertFormsPattern(board, to, colour);
+      if (makesFour && !qualified) continue;
+      count++;
+      if (makesFour) wins++;
+    }
+    return { count, wins };
+  }
+
+  function expertBoardOptions(board, colour, player, protectedId = null, moveAllowed = true) {
+    const qualified = bothSpecialsReturned(player);
+    let moves = 0, jumps = 0;
+    for (let from = 0; from < 36; from++) {
+      const piece = board[from];
+      if (!piece || piece.colour !== colour || piece.pinned || piece.id === protectedId) continue;
+      if (moveAllowed && moves < 2) {
+        for (const to of R.adjacentDestinations(board, from)) {
+          if (!qualified && expertFormsPattern(board, to, colour, from)) continue;
+          moves++;
+          if (moves >= 2) break;
+        }
+      }
+      if (jumps < 2) {
+        for (const jump of R.jumpDestinations(board, from)) {
+          const over = board[jump.over];
+          if (!over || over.colour === colour || over.pinned) continue;
+          if (!qualified && expertFormsPattern(board, jump.to, colour, from, jump.over)) continue;
+          jumps++;
+          if (jumps >= 2) break;
+        }
+      }
+      if (moves >= 2 && jumps >= 2) break;
+    }
+    return {moves, jumps};
+  }
+
+  function expertHandedDanger(board, recipient, colour, protectedId = null, allowMove = true) {
+    const placement = expertLegalPlacements(board, colour, recipient);
+    if (!placement.count) return -12000; // choosing this colour forces a forfeit
+    const ready = bothSpecialsReturned(recipient);
+    if (ready && placement.wins) return 20000 + placement.wins * 50;
+    const options = expertBoardOptions(board, colour, recipient, protectedId, allowMove);
+    const flags = state.completedRequirements[recipient];
+    // A first Jump is strategically scarcer than a first Move, according to
+    // the 36,000-game v19.0.5 tournament; repeat actions are still useful.
+    const jumpWeight = flags.jump ? 65 : 1500;
+    const moveWeight = flags.move ? 25 : 310;
+    return options.jumps * jumpWeight + options.moves * moveWeight;
+  }
+
+  function expertOpportunityScore(board, player, protectedId = null) {
+    const values = ["black","white"].map(colour =>
+      expertBoardOptions(board, colour, player, protectedId));
+    const flags = state.completedRequirements[player];
+    const jumps = values.map(v => v.jumps);
+    const moves = values.map(v => v.moves);
+    // The opponent normally controls our next handed colour: having both
+    // colours useful is considerably better than relying on one colour.
+    return (flags.jump ? 25 : 165) * (Math.min(...jumps) * 2 + Math.max(...jumps)) +
+      (flags.move ? 8 : 42) * (Math.min(...moves) * 2 + Math.max(...moves));
+  }
+
+  // Keep the expensive reply-aware calculation bounded on phones. Take
+  // promising candidates of EACH kind, not just the current highest type:
+  // otherwise an attractive early Move can crowd out defensive placements.
+  function expertShortlist(actions) {
+    if (actions.length <= 30) return actions;
+    const flags = state.completedRequirements[state.currentPlayer];
+    const top = [];
+    for (const type of ["jump","move","place"]) {
+      const group = actions.filter(a=>a.type===type).map(a=>({
+        action:a,
+        score:centreScore(a.to) +
+          patternProgress(boardAfterAction(a,true),state.assignedColour) * .4 +
+          (type==="jump"&&!flags.jump ? 1600 : 0) +
+          (type==="move"&&!flags.move ? 300 : 0)
+      })).sort((a,b)=>b.score-a.score);
+      top.push(...group.slice(0,10).map(x=>x.action));
+      // Include distant or edge moves, which can break Jump threats even
+      // when their immediate positional score is low.
+      if (group.length>10) {
+        const step=Math.max(1,Math.floor((group.length-10)/3));
+        for(let k=10;k<group.length&&top.filter(x=>x.type===type).length<13;k+=step)
+          top.push(group[k].action);
+      }
+    }
+    return top;
+  }
+
+  function expertActionScore(action) {
+    const board = boardAfterAction(action, true);
+    const self = state.currentPlayer, opponent = other(self);
+    const flags = state.completedRequirements[self];
+    let score = centreScore(action.to) + patternProgress(board, state.assignedColour) * 1.5;
+    if (action.type === "jump" && !flags.jump) score += 2450;
+    if (action.type === "move" && !flags.move) score += 440;
+    if (action.type === "jump") score += 90;
+    if (action.type === "move") score += 20;
+
+    const movedId = action.type === "place" ? null : state.board[action.from]?.id;
+    score += expertOpportunityScore(board, self) * .7;
+    const allowed = ["black","white"].filter(colour =>
+      reserveCount(colour) - (state.assignedColour === colour ? 1 : 0) > 0);
+    const dangers = allowed.map(colour => expertHandedDanger(board, opponent, colour, movedId));
+    if (dangers.length) {
+      // After Place we choose the opponent's colour; after Move/Jump the
+      // responder chooses their own mandatory placement colour or piece.
+      const threat = action.type === "place" ? Math.min(...dangers) : Math.max(...dangers);
+      score -= threat * (action.type === "place" ? .95 : .42);
+    }
+    // The responder gets first compulsory placement after Move/Jump. If an
+    // already-qualified responder can win with it, avoid that action.
+    if (action.type !== "place" && bothSpecialsReturned(opponent)) {
+      const responderColours = action.type === "jump"
+        ? [state.assignedColour, state.board[action.over]?.colour]
+        : allowed;
+      if (responderColours.some(colour => colour && expertLegalPlacements(board, colour, opponent).wins))
+        score -= 25000;
+    }
+    return score;
+  }
+
+  function expertChooseHandedColour(colours, selfPlacement) {
+    const recipient = state.currentPlayer;
+    if (!selfPlacement) {
+      return chooseBestByScore(colours, colour =>
+        expertHandedDanger(state.board, recipient, colour, state.protectedPieceId,
+          ordinaryReserveIndices().length > 1), false);
+    }
+    // Move consequence: *we* place the extra reserve piece first. Choose a
+    // colour with at least one legal square and the best safe placement.
+    return chooseBestByScore(colours, colour => {
+      let best = -Infinity;
+      for (let to = 0; to < 36; to++) {
+        if (state.board[to]) continue;
+        if (!bothSpecialsReturned(recipient) && expertFormsPattern(state.board,to,colour)) continue;
+        const board = [...state.board];board[to] = {colour};
+        const opponent = other(recipient);
+        const risk = ["black","white"].map(c =>
+          expertHandedDanger(board, opponent, c, state.protectedPieceId));
+        best = Math.max(best, centreScore(to) * 2 +
+          expertOpportunityScore(board, recipient) * .5 - Math.max(...risk) * .3 +
+          (bothSpecialsReturned(recipient) && expertFormsPattern(state.board,to,colour) ? 30000 : 0));
+      }
+      return best;
+    }, true);
+  }
+
+  function expertJumpChoice(c) {
+    const choices = [...new Set([c.heldColour, c.jumpedPiece.colour])];
+    const responder = c.responder, jumper = c.jumper;
+    return chooseBestByScore(choices, colour => {
+      let best = -Infinity;
+      const otherPiece = colour === c.jumpedPiece.colour ? c.heldColour : c.jumpedPiece.colour;
+      for (let to = 0; to < 36; to++) {
+        if (state.board[to]) continue;
+        if (!bothSpecialsReturned(responder) && expertFormsPattern(state.board,to,colour)) continue;
+        const board = [...state.board];board[to]={colour};
+        const reply = expertLegalPlacements(board,otherPiece,jumper);
+        const opponentWin = bothSpecialsReturned(jumper) && reply.wins;
+        const forcedLoss = !reply.count;
+        const ownWin = bothSpecialsReturned(responder) && expertFormsPattern(state.board,to,colour);
+        const score = (ownWin ? 30000 : 0) + (forcedLoss ? 25000 : 0) -
+          (opponentWin ? 30000 : 0) + centreScore(to) * 2 +
+          expertOpportunityScore(board,responder) * .3 -
+          expertOpportunityScore(board,jumper,c.protectedPieceId) * .3;
+        best=Math.max(best,score);
+      }
+      return best;
+    }, true);
+  }
+
   function chooseBestByScore(items, scoreOf, highest = true) {
     if (!items.length) return null;
     let bestScore = highest ? -Infinity : Infinity;
@@ -936,9 +1126,9 @@
         applyJumpChoice(choices[Math.floor(Math.random() * choices.length)]);
         return;
       }
-      const chosen = chooseBestByScore(choices, colour =>
-        countImmediatePlacementWins(state.board, colour) * 1000 +
-        (settings.level === "expert" ? patternProgress(state.board, colour) : 0), true);
+      const chosen = settings.level === "expert" ? expertJumpChoice(c) :
+        chooseBestByScore(choices, colour =>
+          countImmediatePlacementWins(state.board, colour) * 1000, true);
       applyJumpChoice(chosen);
       return;
     }
@@ -965,9 +1155,15 @@
       return;
     }
 
-    // Expert also chooses the exact physical reserve piece. That matters in
-    // Lipfty 15 because placing an outside special piece unblocks its
-    // matching inner anchor; clearing an edge only makes corners available.
+    // Expert uses the actual colour recipient and possible Move/Jump actions.
+    // In Final Four the physical corner (and its pinned colour) still matters.
+    if (settings.level === "expert" && !state.finalFourPhase) {
+      const chosen = expertChooseHandedColour(colours,selfPlacement);
+      if (chosen) chooseColour(chosen);
+      return;
+    }
+
+    // In Final Four choose among the remaining physical corner pieces.
     const candidates = [];
     for (const colour of colours) {
       for (const index of activeReserveIndices(colour, exclude)) candidates.push({ colour, index });
@@ -1005,7 +1201,11 @@
       const chosen = winning.length ? pool[Math.floor(Math.random()*pool.length)] :
         chooseBestByScore(pool, to => {
           const board = [...state.board]; board[to] = { colour };
-          return patternProgress(board, colour) * 6 + centreScore(to);
+          return settings.level === "expert" ?
+            centreScore(to) + expertOpportunityScore(board,state.currentPlayer) * .6 -
+            expertOpportunityScore(board,other(state.currentPlayer),state.protectedPieceId) * .7 +
+            patternProgress(board,colour) :
+            patternProgress(board, colour) * 6 + centreScore(to);
         }, true);
       placePiece(chosen);
       return;
@@ -1030,7 +1230,9 @@
     // Shared colours make greedy line-building an unsafe default.
     const action = wins.length
       ? candidates[Math.floor(Math.random()*candidates.length)]
-      : chooseBestByScore(candidates, candidate => positionalActionScore(candidate, true), true);
+      : chooseBestByScore(settings.level === "expert" ? expertShortlist(candidates) : candidates,
+          candidate => settings.level === "expert"
+            ? expertActionScore(candidate) : positionalActionScore(candidate, true), true);
     if (action.type === "place") placePiece(action.to);
     else { selectBoardPiece(action.from); moveOrJump(action.to); }
   }
