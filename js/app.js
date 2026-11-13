@@ -4,7 +4,7 @@
   // This is the version of the JavaScript actually running in this tab.
   // Build-info can update while an old tab stays open, so never use that
   // separate file as evidence that the currently executing code is new.
-  const APP_CODE_VERSION = "19.0.5";
+  const APP_CODE_VERSION = "20.0.1";
   function isNewerPublishedVersion(published) {
     if (typeof published !== "string" || !/^\d+\.\d+\.\d+$/.test(published)) return false;
     const currentParts = APP_CODE_VERSION.split(".").map(Number);
@@ -752,11 +752,15 @@
       render(); processFlow(); return;
     }
 
-    state.consequence = { type:"jump-choice", jumper:mover, responder, heldIndex, heldColour, jumpedPiece:jumped, protectedPieceId:piece.id };
+    // v20: Fixed order on EVERY Jump, not only the first qualifying Jump.
+    // Opponent redeploys the exact jumped piece; jumper places the exact handed reserve.
+    // The ordinary next turn belongs to the opponent once both placements finish.
+    state.consequence = { type:"jump-redeploy-first", jumper:mover, responder, heldIndex, heldColour, jumpedPiece:jumped, protectedPieceId:piece.id };
     state.currentPlayer = responder;
     state.colourChooser = responder;
     state.protectedPieceId = piece.id;
-    state.selectedReserveIndex = null; state.assignedColour = null; state.choosingColour = true;
+    state.redeployPiece = jumped;
+    state.selectedReserveIndex = null; state.assignedColour = null; state.choosingColour = false;
     render(); processFlow();
   }
 
@@ -1338,9 +1342,14 @@
       if (state.choosingColour) return `${playerName(state.colourChooser)}: choose the colour ${playerName(state.currentPlayer)} must place as an Opening Four piece.`;
       return `${playerName(state.currentPlayer)}: place the ${colourName(state.assignedColour)} Opening Four piece on any empty 6×6 corner.`;
     }
-    if (state.consequence?.type === "jump-choice" && state.choosingColour) {
-      const firstJump = state.pendingReturnPlayer === state.consequence.jumper && state.pendingReturnKind === "jump";
-      return `${playerName(state.currentPlayer)}: choose which piece to place after ${playerName(state.consequence.jumper)}'s Jump. Both compulsory placements must be completed.${firstJump ? " Their Red Jump special then returns automatically." : ""}`;
+    if (state.consequence?.type === "jump-redeploy-first" && state.redeployPiece) {
+      const c = state.consequence;
+      const firstJump = state.pendingReturnPlayer === c.jumper && state.pendingReturnKind === "jump";
+      return `JUMP 1/3 — ${playerName(c.responder)}: place the jumped ${colourName(c.jumpedPiece.colour)} piece. Then ${playerName(c.jumper)} places the handed ${colourName(c.heldColour)} piece.${firstJump ? " The Red special returns after both placements." : ""}`;
+    }
+    if (state.consequence?.type === "jump-held-second") {
+      const c = state.consequence;
+      return `JUMP 2/3 — ${playerName(c.jumper)}: place the originally handed ${colourName(c.heldColour)} piece. Step 3: ${playerName(c.responder)} takes the next normal turn.`;
     }
     if (state.consequence?.type === "move" && state.consequence.step === 1 && state.choosingColour) {
       const firstMove = state.pendingReturnPlayer === state.consequence.mover && state.pendingReturnKind === "move";
@@ -1531,10 +1540,11 @@
     // A fixed colour is an instruction, even though its button cannot be clicked.
     const activeColour = state.winner === null && !state.pendingSwap && !state.choosingColour
       ? (state.redeployPiece?.colour || state.assignedColour) : null;
-    const jumpChoice = state.consequence?.type === "jump-choice" && state.choosingColour;
     el("reserve-heading").textContent = state.winner !== null ? "Colours"
       : state.pendingSwap ? "Position decision"
-      : state.choosingColour ? (jumpChoice ? "Choose piece to place" : !state.swapDone && state.heldCorners.every(piece=>piece===null) ? "Choose first colour" : "Choose a colour")
+      : state.choosingColour ? (!state.swapDone && state.heldCorners.every(piece=>piece===null) ? "Choose first colour" : "Choose a colour")
+      : state.consequence?.type === "jump-redeploy-first" ? "Jump 1/3 · jumped piece"
+      : state.consequence?.type === "jump-held-second" ? "Jump 2/3 · handed piece"
       : "Colour to use";
     for (const [colour, button] of [["black", blackBtn], ["white", whiteBtn]]) {
       const required = activeColour === colour;
@@ -1548,25 +1558,24 @@
       if (required) button.querySelector("small").textContent = state.redeployPiece
         ? "Place jumped piece" : state.phase === "opening" ? "Place Opening Four piece"
         : canMoveOrJump() ? "Use this colour" : "Place this piece";
-      else if (jumpChoice) button.querySelector("small").textContent =
-        colour === state.consequence.heldColour ? "Originally handed piece" : "Jumped piece";
     }
 
     reserveInfoEl.textContent = state.pendingSwap
       ? "Accept the first placement or Take position. Both players retain their Red Jump and Blue Move specials."
       : state.phase === "opening"
       ? "Two same-colour special pieces at each outside corner. The chosen top piece flashes; dots mark where it can be placed."
+      : state.winner === null && state.consequence?.type === "jump-redeploy-first" && state.redeployPiece
+      ? `Jump 1/3: ${playerName(state.currentPlayer)} places the jumped ${colourName(state.redeployPiece.colour)} piece. The jumper then places the handed piece.`
+      : state.winner === null && state.consequence?.type === "jump-held-second" && state.assignedColour
+      ? `Jump 2/3: ${playerName(state.currentPlayer)} places the handed ${colourName(state.assignedColour)} piece. The opponent then takes the next turn.`
       : state.redeployPiece ? `Place the jumped ${colourName(state.redeployPiece.colour)} piece on a dotted square.`
       : state.finalFourPhase ? "Final Four: choose a shaped corner piece and place it. No Move or Jump."
       : "Complete a Move AND a Jump before you can win. Each earned special returns after its compulsory placements. The top message shows the currently legal actions.";
 
     swapBox.hidden = !state.pendingSwap || isComputer(state.pendingSwap?.decider);
-    jumpChoiceBox.hidden = !(state.consequence?.type === "jump-choice" && state.choosingColour && !isComputer(state.colourChooser));
-    if (!jumpChoiceBox.hidden) {
-      const c=state.consequence;
-      el("choose-handed").textContent=`Place handed ${colourName(c.heldColour)}`;
-      el("choose-jumped").textContent=`Place jumped ${colourName(c.jumpedPiece.colour)}`;
-    }
+    // The obsolete v19 piece-order chooser is retained in hidden markup for
+    // compatibility with existing layout tests, but never shown in v20.
+    jumpChoiceBox.hidden = true;
     undoBtn.disabled = !canUndo();
     renderBoard();
   }

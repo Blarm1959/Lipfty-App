@@ -1,8 +1,8 @@
-const VERSION = "19.0.5";
+const VERSION = "20.0.1";
 const CACHE = `lipfty-v${VERSION}`;
 const ASSETS = [
   "./", "./index.html", "./offline.html", "./css/style.css", "./css/lipfty8-layout.css",
-  "./js/rules.js?v=19.0.5", "./js/app.js?v=19.0.5", "./css/lipfty19.css", "./manifest.json", "./package.json", "./build-info.json"
+  "./js/rules.js?v=20.0.1", "./js/app.js?v=20.0.1", "./css/lipfty19.css", "./manifest.json", "./package.json", "./build-info.json"
 ];
 
 self.addEventListener("install", event => {
