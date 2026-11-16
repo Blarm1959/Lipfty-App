@@ -4,7 +4,7 @@
   // This is the version of the JavaScript actually running in this tab.
   // Build-info can update while an old tab stays open, so never use that
   // separate file as evidence that the currently executing code is new.
-  const APP_CODE_VERSION = "20.0.1";
+  const APP_CODE_VERSION = "20.0.2";
   function isNewerPublishedVersion(published) {
     if (typeof published !== "string" || !/^\d+\.\d+\.\d+$/.test(published)) return false;
     const currentParts = APP_CODE_VERSION.split(".").map(Number);
@@ -16,6 +16,9 @@
   }
   const R = window.LipftyRules;
   const CORNERS = [0, 7, 56, 63];
+  // Opposite diagonals of the outside 8x8 board. Blue Move specials must
+  // finish opposite each other; likewise the two Red Jump specials.
+  const OPPOSITE_CORNER = { 0: 63, 7: 56, 56: 7, 63: 0 };
   const ANCHORS = [...R.ANCHOR_SQUARES];
   const EDGE_DEFS = [
     { name: "top", cells: [1,2,3,4,5,6], corners: [0,1] },
@@ -292,8 +295,9 @@
   // the continuation, so resolve the earned return before showing Game over.
   function settleEarnedCornerOnGameEnd() {
     if(state.pendingReturnPlayer!==null){
-      if(!putHeldCorner(state.pendingReturnPlayer,firstEmptyCorner(),state.pendingReturnKind))
-        throw Error("No empty outside corner for earned special");
+      const held = state.heldRequirements[state.pendingReturnPlayer]?.[state.pendingReturnKind];
+      if(!held || !putHeldCorner(state.pendingReturnPlayer,firstEmptyCorner(held.colour),state.pendingReturnKind))
+        throw Error("No diagonally compatible outside corner for earned special");
     }
     state.pendingReturnPlayer=null;
     state.pendingReturnKind=null;
@@ -355,13 +359,36 @@
     return true;
   }
 
-  function firstEmptyCorner() {
-    return CORNERS.find(index => !state.reserve.locked[index]);
+  function firstEmptyCorner(colour = null) {
+    // First return fixes the diagonal pair for its colour. A second return
+    // of that colour must use the opposite corner, even if other corners
+    // happen to be empty. For the other colour, reserve an empty diagonal.
+    if(colour){
+      const matching=CORNERS.filter(index => state.reserve.locked[index]===colour);
+      if(matching.length>1)return null;
+      if(matching.length===1){
+        const opposite=OPPOSITE_CORNER[matching[0]];
+        return state.reserve.locked[opposite] ? null : opposite;
+      }
+      return CORNERS.find(index => !state.reserve.locked[index] &&
+        !state.reserve.locked[OPPOSITE_CORNER[index]]) ?? null;
+    }
+    return CORNERS.find(index => !state.reserve.locked[index]) ?? null;
   }
 
   function putHeldCorner(player,index,kind=state.pendingReturnKind) {
     const held=state.heldRequirements[player]?.[kind];
     if(!held||!CORNERS.includes(index)||state.reserve.locked[index])return false;
+    const matching=CORNERS.filter(i => state.reserve.locked[i]===held.colour);
+    if(matching.length>1)return false;
+    if(matching.length===1){
+      // Its matching special determines the only permitted corner.
+      if(OPPOSITE_CORNER[index]!==matching[0])return false;
+    } else if(state.reserve.locked[OPPOSITE_CORNER[index]]) {
+      // The first piece of a colour must not occupy the opposite corner
+      // of a different colour (that corner is reserved for its partner).
+      return false;
+    }
     state.reserve.locked[index]=held.colour;
     state.heldRequirements[player][kind]=null;
     return true;
@@ -489,8 +516,8 @@
 
   function nextNormalTurn(current, chooser, protectedId = null) {
     // Both human and computer return the held special automatically after
-    // the Move/Jump's two compulsory placements. The first vacant corner is
-    // deterministic, needs no further UI decision and preserves the four pieces.
+    // the Move/Jump's two compulsory placements. The first compatible corner
+    // is deterministic; same-colour specials occupy opposite diagonals.
     settleEarnedCornerOnGameEnd();
     // v19: keep Move/Jump legal while any ordinary reserves remain.
     if(ordinaryReserveIndices().length===0 && finishQualificationForfeit())return;
