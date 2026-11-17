@@ -1,0 +1,54 @@
+/* v20.0.4: compact, read-only display of ordinary unplaced pieces.
+   Qualification specials remain in the rows above; these are NOT specials. */
+.held-pieces {
+  margin-top:10px;
+  padding-top:9px;
+  border-top:1px solid #d9e2eb;
+  display:grid;
+  gap:5px;
+  min-width:0;
+}
+.held-pieces__heading {
+  display:block;
+  font-size:.78rem;
+  line-height:1.2;
+  color:#314d68;
+  margin-bottom:1px;
+}
+.held-pieces__row {
+  display:grid;
+  grid-template-columns:minmax(60px,1fr) 22px minmax(62px,1.1fr);
+  align-items:center;
+  column-gap:7px;
+  min-width:0;
+  font-size:.77rem;
+  line-height:1.2;
+}
+.held-pieces__name {
+  min-width:0;
+  overflow-wrap:anywhere;
+  color:#233d57;
+}
+.held-pieces__status {
+  min-width:0;
+  overflow-wrap:anywhere;
+  color:#486279;
+}
+.held-pieces__token.piece {
+  box-sizing:border-box;
+  width:20px!important;
+  height:20px!important;
+  flex:none;
+  border-radius:50%;
+  margin:0;
+}
+.held-pieces__token--empty.piece {
+  background:transparent!important;
+  box-shadow:none!important;
+  border:2px dashed #b4bfca;
+}
+@media(max-width:560px) {
+  .held-pieces { margin-top:8px; padding-top:7px; gap:4px; }
+  .held-pieces__row { grid-template-columns:minmax(60px,1fr) 20px minmax(60px,1.1fr);font-size:.75rem;gap:6px; }
+  .held-pieces__token.piece { width:18px!important;height:18px!important; }
+}

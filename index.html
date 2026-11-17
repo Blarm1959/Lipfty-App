@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/lipfty8-layout.css">
   <link rel="stylesheet" href="css/lipfty19.css">
+  <link rel="stylesheet" href="css/lipfty20-held.css">
 </head>
 <body>
   <div class="app-shell">
@@ -61,6 +62,19 @@
               <span class="piece piece--special qualification-token" id="qualification-move-piece-1" aria-hidden="true"></span>
               <span class="piece piece--special qualification-token" id="qualification-jump-piece-1" aria-hidden="true"></span>
               <span class="qualification-copy"><strong id="qualification-name-1">Computer</strong><small id="qualification-status-1">Blue Move needed · Red Jump needed</small></span>
+            </div>
+          </div>
+          <div class="held-pieces" aria-label="Ordinary pieces currently held">
+            <strong class="held-pieces__heading">Ordinary pieces in hand</strong>
+            <div class="held-pieces__row">
+              <strong class="held-pieces__name" id="held-piece-name-0">Player</strong>
+              <span class="piece held-pieces__token held-pieces__token--empty" id="held-piece-token-0" aria-hidden="true"></span>
+              <span class="held-pieces__status" id="held-piece-status-0">None</span>
+            </div>
+            <div class="held-pieces__row">
+              <strong class="held-pieces__name" id="held-piece-name-1">Computer</strong>
+              <span class="piece held-pieces__token held-pieces__token--empty" id="held-piece-token-1" aria-hidden="true"></span>
+              <span class="held-pieces__status" id="held-piece-status-1">None</span>
             </div>
           </div>
         </section>
@@ -186,14 +200,15 @@
 
   <dialog id="statistics-dialog"><div class="dialog-heading"><div><p class="dialog-eyebrow">Lipfty</p><h2>Statistics</h2></div><button class="dialog-close" id="close-statistics" type="button">×</button></div><div id="statistics-content" class="statistics-content"></div><div class="dialog-actions"><button class="button button--secondary" id="reset-statistics" type="button">Reset statistics</button></div></dialog>
 
-  <dialog id="help-dialog"><div class="dialog-heading"><div><p class="dialog-eyebrow">How to play</p><h2>Lipfty</h2></div><button class="dialog-close" id="close-help" type="button" aria-label="Close">×</button></div><div class="rules-copy"><p><a href="Lipfty-Rules.md" target="_blank" rel="noopener">Current v20 rules (Markdown)</a> · <a href="Lipfty-Rules.pdf" target="_blank" rel="noopener">Current v20.0.3 printable rules (PDF)</a></p>
+  <dialog id="help-dialog"><div class="dialog-heading"><div><p class="dialog-eyebrow">How to play</p><h2>Lipfty</h2></div><button class="dialog-close" id="close-help" type="button" aria-label="Close">×</button></div><div class="rules-copy"><p><a href="Lipfty-Rules.md" target="_blank" rel="noopener">Current v20 rules (Markdown)</a> · <a href="Lipfty-Rules.pdf" target="_blank" rel="noopener">Current v20.0.4 printable rules (PDF)</a></p>
     <p><strong>Objective.</strong> First complete a Move and a Jump and return BOTH specials to the outer corners. Until then it is illegal to create four of either shared colour in a line (Easy) or a tight 2×2 square (Standard). Once both specials have returned, such a pattern wins. Larger spaced squares never count.</p>
     <p><strong>Setup.</strong> The inner 6×6 starts empty. Place 24 ordinary reserves around the outside edges. Each player starts holding one Red special (Jump) and one Blue special (Move), leaving all four outside corners empty. The opening colour chooser chooses an ordinary colour for the first placer; that colour does not assign special pieces.</p>
     <p><strong>First placement.</strong> The opponent places the first ordinary piece of the chosen colour. The chooser then selects Accept or Take position. The first piece stays where placed; both players retain their Red Jump and Blue Move specials. When the computer makes this decision, a popup explains the result; press OK to continue. Subsequent ordinary colours remain opponent-selected.</p>
     <p><strong>Normal play.</strong> The opponent selects an ordinary reserve colour. You may Place, Move an unpinned board piece of that colour by one adjacent cell, or Jump over an adjacent unpinned piece of the opposite colour into an empty cell. When both players hold a piece, only Place or Move is available to the first holder; then placements are compulsory. Your first Move earns Blue and your first Jump earns Red, in either order. The earned special returns automatically after compulsory placements. Creating four before both have returned is illegal.</p>
-    <p><strong>Corner returns (v20.0.3).</strong> No player chooses a return corner. The first returned special automatically occupies an empty corner, setting the diagonal for its colour. Its matching special must return diagonally opposite. A special of the other colour uses one of the remaining corners, leaving its diagonally opposite corner for its partner. This works in every return order.</p>
-    <p><strong>Move consequence (v20.0.3).</strong> The mover keeps the originally handed piece and chooses another ordinary reserve piece for their opponent. Both now hold one piece. The opponent may Place or Move (never Jump). A normal Move requires an additional unreserved ordinary piece. The moved piece remains temporarily protected.</p>
+    <p><strong>Corner returns (v20.0.4).</strong> No player chooses a return corner. The first returned special automatically occupies an empty corner, setting the diagonal for its colour. Its matching special must return diagonally opposite. A special of the other colour uses one of the remaining corners, leaving its diagonally opposite corner for its partner. This works in every return order.</p>
+    <p><strong>Move consequence (v20.0.4).</strong> The mover keeps the originally handed piece and chooses another ordinary reserve piece for their opponent. Both now hold one piece. The opponent may Place or Move (never Jump). A normal Move requires an additional unreserved ordinary piece. The moved piece remains temporarily protected.</p>
     <p><strong>Jump consequence (v20.0.3, EVERY Jump).</strong> The jumper retains the exact handed ordinary piece and gives the exact jumped-over piece to the opponent. Both now hold one piece, necessarily of opposite colours. The opponent may Place or Move an existing board piece of that colour, but cannot Jump. The jumper then has a compulsory placement. The first Jump earns Red; later Jumps do not earn additional specials.</p>
+    <p><strong>Held-piece display.</strong> The Move AND Jump requirements panel also shows ordinary pieces held by each player. A coloured circle means that player is holding an unplaced piece; None means their ordinary hand is empty. These ordinary pieces are separate from the special Move and Jump qualification tokens.</p>
     <p><strong>When both hold one piece.</strong> If the first holder Places, the other must Place, and the first holder then chooses the next ordinary piece for the other. If the first holder instead Moves, the other must Place, the first holder then must Place, and the second holder chooses the next piece for the first. No further Move or Jump is legal during the compulsory placements. Nobody may ever receive a second unplaced piece. Both earned specials return automatically when the exchange finishes.</p>
     <p><strong>Deadline and Final Four.</strong> Keep Move and Jump available while ordinary reserves remain, subject to the usual legal restrictions. After the final ordinary reserve is placed, only a player who has completed both actions can win by opponent qualification failure. If neither player qualified, there is no winner. If both qualified, play the four returned outside corner specials as pinned Final Four pieces.</p>
     <p><strong>Illegal patterns and compulsory placements.</strong> Before both your specials have physically returned, you cannot create four of either colour in a line (or a tight square in Standard), whether by Place, Move, Jump or a compulsory placement. A Jump is judged after removing the jumped piece. Three in a row is legal. If every remaining placement square is forbidden during a compulsory placement, you lose immediately, even if the opponent has not qualified. On an ordinary turn a legal Move or Jump is an alternative; you only lose if no legal action remains. A qualified player may complete a winning pattern; a win ends compulsory placements. The moved/jumped piece retains its one-turn protection.</p>
@@ -202,8 +217,8 @@
     <p><strong>Clock and Undo.</strong> Time expiry ends the game; under the v19 qualification rule an opponent who has not completed both actions does not receive a victory. Undo restores position, clock and statistics and returns to a human decision against the computer.</p>
   </div></dialog>
 
-  <script src="js/rules.js?v=20.0.3"></script>
-  <script src="js/app.js?v=20.0.3"></script>
+  <script src="js/rules.js?v=20.0.4"></script>
+  <script src="js/app.js?v=20.0.4"></script>
 </body>
 </html>
 

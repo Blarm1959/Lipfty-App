@@ -4,7 +4,7 @@
   // This is the version of the JavaScript actually running in this tab.
   // Build-info can update while an old tab stays open, so never use that
   // separate file as evidence that the currently executing code is new.
-  const APP_CODE_VERSION = "20.0.3";
+  const APP_CODE_VERSION = "20.0.4";
   function isNewerPublishedVersion(published) {
     if (typeof published !== "string" || !/^\d+\.\d+\.\d+$/.test(published)) return false;
     const currentParts = APP_CODE_VERSION.split(".").map(Number);
@@ -1348,13 +1348,9 @@
 
   function statusText() {
     const explanation=state.winner===null && !state.pendingSwap ? state.positionDecisionMessage : "";
-    const c=state.consequence;
-    const remaining = state.winner!==null || !c ? 0
-      : c.type==="two-held-choice" || c.type==="move-handover" ? 2
-      : c.type==="two-held-move-second" ? 2
-      : c.type.startsWith("two-held-") ? 1 : 0;
+    // Never call an optional Place-or-Move decision a compulsory placement.
+    // The exact action is already stated in the turn message below.
     return (explanation ? explanation + " " : "") + turnStatusText()
-      + (remaining ? ` COMPULSORY PLACEMENT: ${remaining} remaining.` : "")
       + (state.winner === null && state.boardSelectionNotice ? ` ${state.boardSelectionNotice}` : "");
   }
   function turnStatusText() {
@@ -1377,14 +1373,18 @@
     const c=state.consequence;
     if(c?.type==="move-handover")
       return `${playerName(c.mover)}: choose one ordinary reserve piece for ${playerName(c.responder)}. Both players will then hold one piece.`;
-    if(c?.type==="two-held-choice")
-      return `${playerName(c.first)}: you and ${playerName(c.second)} each hold one piece. Place ${colourName(c.firstHeld.colour)} (then ${playerName(c.second)} must Place), or Move an existing ${colourName(c.firstHeld.colour)} piece (then ${playerName(c.second)} Places, then you Place). Jump is illegal. Place gives you the next handover; Move gives it to ${playerName(c.second)}.`;
+    if(c?.type==="two-held-choice") {
+      const otherName=playerName(c.second), name=playerName(c.first), colour=colourName(c.firstHeld.colour);
+      if(!currentBoardActions().includes("Move"))
+        return `${name}: MUST PLACE your held ${colour}; no legal Move is available. ${otherName} must then Place. You choose the next piece for ${otherName}.`;
+      return `${name}: PLACE or MOVE your held ${colour}. Place: ${otherName} must then Place; you choose next. Move: ${otherName} must Place, then you must Place; ${otherName} chooses next. No Jump.`;
+    }
     if(c?.type==="two-held-force-second")
-      return `${playerName(c.second)}: compulsory Place of held ${colourName(c.secondHeld.colour)}. ${playerName(c.first)} chooses the next piece for you.`;
+      return `${playerName(c.second)}: MUST PLACE your held ${colourName(c.secondHeld.colour)}. ${playerName(c.first)} chooses the next piece for you.`;
     if(c?.type==="two-held-move-second")
-      return `${playerName(c.second)}: compulsory Place of held ${colourName(c.secondHeld.colour)} after ${playerName(c.first)}'s Move. ${playerName(c.first)} must then Place.`;
+      return `${playerName(c.second)}: MUST PLACE your held ${colourName(c.secondHeld.colour)} after ${playerName(c.first)}'s Move. ${playerName(c.first)} must then Place.`;
     if(c?.type==="two-held-move-last")
-      return `${playerName(c.first)}: compulsory Place of your held ${colourName(c.firstHeld.colour)}. ${playerName(c.second)} then chooses the next piece for you.`;
+      return `${playerName(c.first)}: MUST PLACE your held ${colourName(c.firstHeld.colour)}. ${playerName(c.second)} then chooses the next piece for you.`;
     if (state.choosingColour && state.finalFourPhase) return `${playerName(state.currentPlayer)}: choose a Final Four corner piece to place. No Move or Jump.`;
     if (state.choosingColour) return ordinaryReserveIndices(state.consequence?.heldIndex).length
       ? !state.swapDone && state.heldCorners.every(piece=>piece===null)
@@ -1518,6 +1518,44 @@
     }
   }
 
+  // Display ordinary unplaced pieces only (never the Red/Blue qualification
+  // specials). Follow the actual exchange state, not the visible reserve tile:
+  // both players may simultaneously hold a piece during a Move or Jump.
+  function ordinaryPiecesHeld() {
+    const held=[null,null];
+    if(state.phase!=="main" || state.finalFourPhase) return held;
+    const c=state.consequence;
+    if(c?.type==="move-handover") {
+      held[c.mover]=c.heldColour;
+      return held;
+    }
+    if(c?.type?.startsWith("two-held-")) {
+      if(["two-held-choice","two-held-move-second","two-held-move-last"].includes(c.type))
+        held[c.first]=c.firstHeld.colour;
+      if(["two-held-choice","two-held-force-second","two-held-move-second"].includes(c.type))
+        held[c.second]=c.secondHeld.colour;
+      return held;
+    }
+    if(!state.choosingColour && !state.pendingSwap &&
+       ((state.selectedReserveIndex!==null && !CORNERS.includes(state.selectedReserveIndex)) || state.redeployPiece))
+      held[state.currentPlayer]=state.redeployPiece?.colour || state.assignedColour;
+    return held;
+  }
+
+  function renderOrdinaryHeldPieces() {
+    const held=ordinaryPiecesHeld();
+    for(let player=0;player<2;player++) {
+      const colour=held[player];
+      const token=el("held-piece-token-"+player);
+      token.className="piece held-pieces__token"+
+        (colour ? " piece--"+colour : " held-pieces__token--empty");
+      token.style.backgroundColor=colour ? colourCss(colour) : "";
+      el("held-piece-name-"+player).textContent=playerName(player);
+      el("held-piece-status-"+player).textContent=colour ? colourName(colour)+" held" : "None";
+      token.title=colour ? colourName(colour)+" ordinary piece held" : "No ordinary piece held";
+    }
+  }
+
   function renderQualificationPanel() {
     for(let player=0;player<2;player++){
       const flags=state.completedRequirements[player];
@@ -1546,6 +1584,7 @@
   function render() {
     applyColours();
     renderQualificationPanel();
+    renderOrdinaryHeldPieces();
     currentEl.textContent = state.winner===null ? playerName(decisionActor()) : "Game over";
     statusEl.textContent = statusText() + (state.lastReleaseMessage ? ` ${state.lastReleaseMessage}.` : "");
     state.lastReleaseMessage = "";
@@ -1573,8 +1612,8 @@
     el("reserve-heading").textContent = state.winner !== null ? "Colours"
       : state.pendingSwap ? "Position decision"
       : state.choosingColour ? (!state.swapDone && state.heldCorners.every(piece=>piece===null) ? "Choose first colour" : "Choose a colour")
-      : state.consequence?.type === "two-held-choice" ? "Both holding · Place or Move"
-      : state.consequence?.type?.startsWith("two-held-") ? "Compulsory placement"
+      : state.consequence?.type === "two-held-choice" ? (currentBoardActions().includes("Move") ? "Place or Move" : "Must Place")
+      : state.consequence?.type?.startsWith("two-held-") ? "Must Place"
       : "Colour to use";
     for (const [colour, button] of [["black", blackBtn], ["white", whiteBtn]]) {
       const required = activeColour === colour;
@@ -1585,9 +1624,14 @@
       button.querySelector(".mini-piece").classList.toggle("piece--special",
         state.phase === "opening" || (required && !!state.redeployPiece?.special) ||
         (required && state.selectedReserveIndex !== null && CORNERS.includes(state.selectedReserveIndex)));
-      if (required) button.querySelector("small").textContent = state.redeployPiece
-        ? "Place jumped piece" : state.phase === "opening" ? "Place Opening Four piece"
-        : canMoveOrJump() ? "Use this colour" : "Place this piece";
+      if (required) {
+        const actions=currentBoardActions();
+        button.querySelector("small").textContent = state.phase === "opening" ? "Place opening piece"
+          : state.consequence?.type === "two-held-choice" ? (actions.includes("Move") ? "Place or Move" : "Must Place")
+          : state.consequence?.type?.startsWith("two-held-") ? "Must Place"
+          : state.redeployPiece ? "Place jumped piece"
+          : actions.length>1 ? actions.join(" / ") : actions.length===1 ? actions[0]+" piece" : "Colour to use";
+      }
     }
 
     reserveInfoEl.textContent = state.pendingSwap
@@ -1595,9 +1639,11 @@
       : state.phase === "opening"
       ? "Two same-colour special pieces at each outside corner. The chosen top piece flashes; dots mark where it can be placed."
       : state.winner === null && state.consequence?.type === "two-held-choice"
-      ? `Both players hold one piece: ${playerName(state.currentPlayer)} may Place or Move the required colour (no Jump). Place controls the next handover; Move hands it to the other player.`
+      ? currentBoardActions().includes("Move")
+        ? "Both players hold a piece. You may Place or Move (not Jump). The next piece chooser depends on your decision."
+        : "Both players hold a piece, but no legal Move is available. You must Place."
       : state.winner === null && state.consequence?.type?.startsWith("two-held-")
-      ? "Compulsory placement: follow the turn message above."
+      ? "Must Place the highlighted held piece. See both players' held pieces below."
       : state.redeployPiece ? `Place the jumped ${colourName(state.redeployPiece.colour)} piece on a dotted square.`
       : state.finalFourPhase ? "Final Four: choose a shaped corner piece and place it. No Move or Jump."
       : "Complete a Move AND a Jump before you can win. Each earned special returns after its compulsory placements. The top message shows the currently legal actions.";
