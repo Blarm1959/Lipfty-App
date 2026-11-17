@@ -52,3 +52,36 @@
   .held-pieces__row { grid-template-columns:minmax(60px,1fr) 20px minmax(60px,1.1fr);font-size:.75rem;gap:6px; }
   .held-pieces__token.piece { width:18px!important;height:18px!important; }
 }
+
+/* v20.0.5: compact the colour chooser to match the 26px qualification
+   tokens. Keep touch targets at least 46px tall. */
+.reserve-panel .reserve-button .mini-piece {
+  width:26px!important;
+  height:26px!important;
+  flex:0 0 26px;
+  border-width:2px;
+}
+@media (min-width:561px) {
+  .reserve-panel .reserve-grid { gap:6px; }
+  .reserve-panel .reserve-button {
+    min-height:47px;
+    padding:5px 8px;
+    gap:9px;
+  }
+  .reserve-panel .reserve-button strong { font-size:.9rem;line-height:1.17; }
+  .reserve-panel .reserve-button small { font-size:.72rem;line-height:1.14; }
+}
+/* The tall quick-rules panel must not set the first grid-row height:
+   that previously created an 80px gap between the left cards. */
+@media (min-width:1121px) {
+  .game-stage > .rules-panel--quick {
+    grid-column:3;
+    grid-row:1 / span 3;
+    align-self:start;
+  }
+  /* While the opening Accept/Take dialog occupies the rules column,
+     keep the old vertical placement to avoid overlapping it. */
+  .game-stage:has(> #swap-box:not([hidden])) > .rules-panel--quick {
+    grid-row:1;
+  }
+}

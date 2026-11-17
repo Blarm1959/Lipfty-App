@@ -4,7 +4,7 @@
   // This is the version of the JavaScript actually running in this tab.
   // Build-info can update while an old tab stays open, so never use that
   // separate file as evidence that the currently executing code is new.
-  const APP_CODE_VERSION = "20.0.4";
+  const APP_CODE_VERSION = "20.0.5";
   function isNewerPublishedVersion(published) {
     if (typeof published !== "string" || !/^\d+\.\d+\.\d+$/.test(published)) return false;
     const currentParts = APP_CODE_VERSION.split(".").map(Number);
